@@ -39,3 +39,4 @@ release-signing.properties
 *.apk
 *.aab
 .zcode/
+/diplay-aviator-debug.apk
