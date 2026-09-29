@@ -448,4 +448,13 @@
     <string name="adb_battery_reading">电池：%1$d%%，%2$d 公里。</string>
     <string name="adb_battery_unreadable">无法读取这辆车的电池信息，因此不会向 iPhone 声明这是电动车。</string>
     <string name="adb_battery_reconnect">如果 CarPlay 在电池数据就绪前已连接，请使用“应用并重新连接”以启用电池数据上报。</string>
+    <string name="amap_navigation">导航投影</string>
+    <string name="amap_navigation_output">仪表与 HUD 导航</string>
+    <string name="amap_navigation_output_description">通过车机的高德协议接收组件，把 CarPlay 导航箭头、距离和路名发送到原车仪表和 HUD</string>
+    <string name="day_night_appearance">昼夜间外观</string>
+    <string name="day_night_auto">跟随车机</string>
+    <string name="day_night_day">始终白天</string>
+    <string name="day_night_night">始终夜间</string>
+    <string name="show_session_log">在屏幕上显示会话日志</string>
+    <string name="show_session_log_description">CarPlay 打开时显示诊断日志，便于车上测试</string>
 </resources>

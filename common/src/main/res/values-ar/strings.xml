@@ -437,4 +437,13 @@
     <string name="adb_battery_reading">البطارية: %1$d٪، %2$d كم.</string>
     <string name="adb_battery_unreadable">تعذّرت قراءة البطارية في هذه السيارة، لذا لا يُبلَّغ iPhone بأنها سيارة كهربائية.</string>
     <string name="adb_battery_reconnect">إذا اتصل CarPlay قبل أن تصبح بيانات البطارية جاهزة، استخدم «تطبيق وإعادة الاتصال» لتفعيل إرسال بيانات البطارية.</string>
+    <string name="amap_navigation">إسقاط التنقل</string>
+    <string name="amap_navigation_output">التنقل على العداد وHUD</string>
+    <string name="amap_navigation_output_description">إرسال أسهم التنقل والمسافة وأسماء الطرق من CarPlay إلى عداد السيارة وHUD عبر مستقبل Amap المتوافق في وحدة الرأس</string>
+    <string name="day_night_appearance">المظهر نهار / ليل</string>
+    <string name="day_night_auto">حسب وحدة الرأس</string>
+    <string name="day_night_day">نهار دائماً</string>
+    <string name="day_night_night">ليل دائماً</string>
+    <string name="show_session_log">إظهار سجل الجلسة على الشاشة</string>
+    <string name="show_session_log_description">عرض سجل التشخيص أثناء فتح CarPlay للاختبار في السيارة</string>
 </resources>

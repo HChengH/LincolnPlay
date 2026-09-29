@@ -12,6 +12,8 @@ import android.graphics.Color
 import android.graphics.SurfaceTexture
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.hardware.Sensor
+import android.hardware.SensorManager
 import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.os.Build
@@ -324,6 +326,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private var menuOpen = false
     private var latestStage = "Preparing CarPlay"
     private var darkMode = false
+    private var lastObservedUiNight = false
     private var activeAirPlaySession: AirPlaySession? = null
     private val activeScreenStreamTypes = mutableSetOf<Int>()
     private var handshakeResetInProgress = false
@@ -400,7 +403,11 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         initializeSessionLog()
-        darkMode = isDarkMode(resources.configuration.uiMode)
+        darkMode = effectiveDarkMode(resources.configuration.uiMode)
+        lastObservedUiNight = isDarkMode(resources.configuration.uiMode)
+        DiagnosticSnifferHook.line = { appendLog(it) }
+        startDebugSniffer()
+        logEnvironmentDiagnostics()
         advancedAudioChannelMappingSupported =
             resources.getBoolean(R.bool.config_advanced_audio_channel_mapping)
         airPlayIdentity = AirPlayPersistence.loadIdentity(this)
@@ -737,7 +744,16 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) applyFullscreenMode()
+        if (hasFocus) {
+            applyFullscreenMode()
+            // Settings changed in DiPlay (day/night override, log overlay) apply when returning.
+            val nextDarkMode = effectiveDarkMode(resources.configuration.uiMode)
+            if (nextDarkMode != darkMode) {
+                darkMode = nextDarkMode
+                syncAirPlayDarkMode()
+            }
+            updateDebugOverlays()
+        }
     }
 
     override fun onStop() {
@@ -747,7 +763,12 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        val nextDarkMode = isDarkMode(newConfig.uiMode)
+        val observedNight = isDarkMode(newConfig.uiMode)
+        if (observedNight != lastObservedUiNight) {
+            lastObservedUiNight = observedNight
+            appendLog("Head-unit night mode ${if (observedNight) "ON" else "OFF"}")
+        }
+        val nextDarkMode = effectiveDarkMode(newConfig.uiMode)
         if (nextDarkMode != darkMode) {
             darkMode = nextDarkMode
             syncAirPlayDarkMode()
@@ -834,6 +855,22 @@ class CarPlayHostActivity : ComponentActivity() {
             textSize = 13f; gravity = Gravity.CENTER; setTextColor(Color.rgb(168, 182, 202)); setPadding(0, dp(20), 0, 0)
         })
         root.addView(panel, FrameLayout.LayoutParams(-1, -1))
+        // On-screen diagnostic overlay for car tests; hidden unless enabled in DiPlay settings.
+        val logScroll = ScrollView(this).apply {
+            visibility = if (AirPlayPersistence.loadSessionLogOverlay(this@CarPlayHostActivity)) View.VISIBLE else View.GONE
+            setBackgroundColor(0xCC0C111B.toInt())
+            isVerticalScrollBarEnabled = true
+        }
+        val logText = TextView(this).apply {
+            textSize = 12f
+            setTextColor(Color.rgb(214, 226, 240))
+            typeface = Typeface.MONOSPACE
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+        }
+        logScroll.addView(logText)
+        root.addView(logScroll, FrameLayout.LayoutParams(-1, dp(160), Gravity.BOTTOM))
+        statusScrollView = logScroll
+        statusView = logText
         videoView = video
         gestureOverlay = gestureLayer
         stageStatusView = stage
@@ -3182,6 +3219,13 @@ class CarPlayHostActivity : ComponentActivity() {
         }
     }
 
+    /** The appearance pushed to the iPhone: the manual override wins over the head unit's uiMode. */
+    private fun effectiveDarkMode(uiMode: Int): Boolean = when (AirPlayPersistence.loadDayNightMode(this)) {
+        AirPlayPersistence.DayNightMode.DAY -> false
+        AirPlayPersistence.DayNightMode.NIGHT -> true
+        AirPlayPersistence.DayNightMode.AUTO -> isDarkMode(uiMode)
+    }
+
     private fun syncAirPlayDarkMode() {
         val session = activeAirPlaySession ?: return
         val night = darkMode
@@ -3503,6 +3547,30 @@ class CarPlayHostActivity : ComponentActivity() {
         }
     }
 
+    /** Facts that identify the head unit and the signals the day/night and HUD work depend on. */
+    private fun logEnvironmentDiagnostics() {
+        appendLog(
+            "Head unit: Android ${Build.VERSION.RELEASE} / API ${Build.VERSION.SDK_INT} " +
+                "${Build.MANUFACTURER} ${Build.MODEL}",
+        )
+        val lightSensor = runCatching {
+            val manager = getSystemService(SensorManager::class.java)
+            val sensor = manager?.getDefaultSensor(Sensor.TYPE_LIGHT)
+            if (sensor != null) "present (${sensor.name})" else "absent"
+        }.getOrElse { "error: ${it.message}" }
+        appendLog("Light sensor: $lightSensor")
+        appendLog("Night mode: uiMode=${if (lastObservedUiNight) "night" else "day"}")
+    }
+
+    /** Starts the debug-only navigation broadcast sniffer when its class is present. */
+    private fun startDebugSniffer() {
+        runCatching {
+            Class.forName("com.shilapi.xcertplay.diag.DebugNavigationSniffer")
+                .getMethod("start", Context::class.java)
+                .invoke(null, applicationContext)
+        }
+    }
+
     private fun setStatus(message: String) {
         runOnUiThread {
             setConnectionStage(message)
@@ -3517,7 +3585,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun updateDebugOverlays() {
-        statusScrollView?.visibility = View.GONE
+        statusScrollView?.visibility =
+            if (AirPlayPersistence.loadSessionLogOverlay(this)) View.VISIBLE else View.GONE
         connectionPanel?.visibility = if (activeScreenStreamTypes.isEmpty()) View.VISIBLE else View.GONE
     }
 
@@ -3541,7 +3610,13 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun appendLog(message: String) {
         val safe = DiagnosticRedactor.redact(message) ?: return
-        sessionLog?.append(formattedLogLine(safe, System.currentTimeMillis()))
+        val now = System.currentTimeMillis()
+        sessionLog?.append(formattedLogLine(safe, now))
+        if (AirPlayPersistence.loadSessionLogOverlay(this)) {
+            logLines.addLast(LogEntry(now, safe))
+            while (logLines.size > OVERLAY_LOG_LINES) logLines.removeFirst()
+            refreshLogView(now)
+        }
     }
 
     private fun appendFileLog(message: String) {
@@ -3639,6 +3714,7 @@ class CarPlayHostActivity : ComponentActivity() {
         const val SCREEN_TYPE_MAIN = 110
         const val SCREEN_TYPE_ALT = 111
         const val LOG_RETENTION_MILLIS = 5 * 60_000L
+        const val OVERLAY_LOG_LINES = 40
         const val DISPLAY_CHANGE_DEBOUNCE_MILLIS = 500L
         const val RECONNECT_DELAY_MILLIS = 2_000L
         const val IAP_TUNNEL_RECONNECT_DELAY_MILLIS = 15_000L

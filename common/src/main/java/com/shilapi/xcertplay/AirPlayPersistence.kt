@@ -65,6 +65,8 @@ object AirPlayPersistence {
     private const val KEY_RIGHT_HAND_DRIVE = "right_hand_drive"
     private const val KEY_HIDE_TOP_BAR = "hide_top_bar"
     private const val KEY_HIDE_BOTTOM_BAR = "hide_bottom_bar"
+    private const val KEY_DAY_NIGHT_MODE = "day_night_mode"
+    private const val KEY_SESSION_LOG_OVERLAY = "session_log_overlay"
     private const val KEY_SAFE_AREA_DRAW_OUTSIDE = "safe_area_draw_outside"
     private const val KEY_AUTO_START_ON_BOOT = "auto_start_on_boot"
     private const val KEY_LOCATION_REPORTING_ENABLED = "location_reporting_enabled"
@@ -79,6 +81,32 @@ object AirPlayPersistence {
     const val DEFAULT_MODEL = "DiPlay"
     const val DEFAULT_OEM_LABEL = "BYD"
     const val DEFAULT_MFI_I2C_PATH = "/dev/i2c-1"
+
+    /** Manual override of the CarPlay appearance; AUTO follows the head unit's night mode. */
+    enum class DayNightMode { AUTO, DAY, NIGHT }
+
+    fun loadDayNightMode(context: Context): DayNightMode {
+        val stored = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_DAY_NIGHT_MODE, null)
+        return DayNightMode.entries.firstOrNull { it.name == stored } ?: DayNightMode.AUTO
+    }
+
+    fun saveDayNightMode(context: Context, mode: DayNightMode) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_DAY_NIGHT_MODE, mode.name)
+            .apply()
+    }
+
+    /** Show the session log on screen while CarPlay is open; used during car tests. */
+    fun loadSessionLogOverlay(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_SESSION_LOG_OVERLAY, false)
+
+    fun saveSessionLogOverlay(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_SESSION_LOG_OVERLAY, enabled)
+            .apply()
+    }
 
     fun loadDisplayScaleTenths(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -245,6 +245,9 @@ class DiPlayActivity : ComponentActivity() {
             }.apply { isEnabled = !exportInProgress }
             card.addView(exportButton, matchButton(10, 60))
             card.addView(button(getString(R.string.choose_save_location), false) { chooseReportDestination() }, matchButton(10, 60))
+            toggle(card, getString(R.string.show_session_log),
+                getString(R.string.show_session_log_description),
+                AirPlayPersistence.loadSessionLogOverlay(this)) { AirPlayPersistence.saveSessionLogOverlay(this, it) }
             val destination = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) getString(R.string.reports_save_to_downloads_diplay) else getString(R.string.choose_where_to_save_your_report)
             card.addView(label(destination + getString(R.string.nothing_is_sent_automatically_protocol_payloads_and_creden), 14, MUTED).apply { setPadding(0, dp(12), 0, 0) })
         }
@@ -266,6 +269,14 @@ class DiPlayActivity : ComponentActivity() {
             toggle(card, getString(R.string.right_hand_drive), getString(R.string.place_carplay_s_controls_closer_to_the_driver), AirPlayPersistence.loadRightHandDrive(this)) { AirPlayPersistence.saveRightHandDrive(this, it) }
             toggle(card, getString(R.string.full_screen), getString(R.string.hide_the_car_s_system_bars_while_carplay_is_open), AirPlayPersistence.loadHideTopBar(this) && AirPlayPersistence.loadHideBottomBar(this)) {
                 AirPlayPersistence.saveHideTopBar(this, it); AirPlayPersistence.saveHideBottomBar(this, it)
+            }
+            val dayNightModes = AirPlayPersistence.DayNightMode.entries
+            choice(card, getString(R.string.day_night_appearance), listOf(
+                getString(R.string.day_night_auto),
+                getString(R.string.day_night_day),
+                getString(R.string.day_night_night),
+            ), dayNightModes.indexOf(AirPlayPersistence.loadDayNightMode(this)), reconnects = false) {
+                AirPlayPersistence.saveDayNightMode(this, dayNightModes[it])
             }
         }
         section(content, getString(R.string.audio_routing)) { card ->
@@ -303,6 +314,13 @@ class DiPlayActivity : ComponentActivity() {
             card.addView(grid)
             card.addView(saveButton, matchButton(12, 56))
             if (aaosSupported) applyChannelEnabled(!AirPlayPersistence.loadAdvancedAudioChannelMapping(this))
+        }
+        section(content, getString(R.string.amap_navigation), R.drawable.ic_dp_navigation) { card ->
+            toggle(card, getString(R.string.amap_navigation_output),
+                getString(R.string.amap_navigation_output_description),
+                com.shilapi.xcertplay.hud.AmapOutputSettings.enabled(this)) {
+                com.shilapi.xcertplay.hud.AmapOutputSettings.setEnabled(this, it)
+            }
         }
         if (com.shilapi.xcertplay.hud.BydOutputSettings.available(this)) section(content, getString(R.string.byd_navigation), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.navigation_on_hud_and_instrument_cluster),

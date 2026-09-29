@@ -16,6 +16,7 @@ object BydNavigationOutputs {
     private val standalone = NavigationOutputWorker("diplay-standalone-output", BydStandaloneNavigationBridge::clear)
     private val hud = NavigationOutputWorker("diplay-hud-output", BydHudBridge::clear)
     private val cluster = NavigationOutputWorker("diplay-cluster-output", BydClusterBridge::clear)
+    private val amap = NavigationOutputWorker("diplay-amap-output", AmapAutoNavigationBridge::clear)
 
     /** The host reports whether its CarPlay map window is on the cluster (see [BydClusterMapPause]). */
     fun setClusterMapShown(shown: Boolean) { BydClusterMapPause.clusterMapShown = shown }
@@ -37,11 +38,15 @@ object BydNavigationOutputs {
     fun start(context: Context) {
         val app = context.applicationContext
         useStandalone = BydStandaloneHudOutput.available(app)
+        val bydClusterAdapter = runCatching { app.packageManager.getPackageInfo("com.byd.amapservice", 0) }.isSuccess
         if (useStandalone) standalone.start { BydStandaloneNavigationBridge.initialize(app) }
         else {
             hud.start { BydHudBridge.initialize(app) }
             cluster.start { BydClusterBridge.initialize(app) }
         }
+        // The standard AmapAuto output targets aftermarket decoders; skip it on units with the
+        // BYD adapter, whose bridge already feeds the same receivers with BYD-specific framing.
+        if (!useStandalone && !bydClusterAdapter) amap.start { AmapAutoNavigationBridge.initialize(app) }
         BydClusterMapPause.initialize(app)
     }
 
@@ -54,8 +59,9 @@ object BydNavigationOutputs {
             hud.submit { BydHudBridge.onFrame(owned) }
             cluster.submit { BydClusterBridge.onFrame(owned) }
         }
+        amap.submit { AmapAutoNavigationBridge.onFrame(owned) }
     }
 
     /** Best effort while alive; Android does not guarantee callbacks before force-stop. */
-    fun endNow() { standalone.clear(); hud.clear(); cluster.clear() }
+    fun endNow() { standalone.clear(); hud.clear(); cluster.clear(); amap.clear() }
 }

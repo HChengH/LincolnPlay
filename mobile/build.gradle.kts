@@ -15,7 +15,8 @@ android {
 
     defaultConfig {
         applicationId = "com.shihab.diplay"
-        minSdk = 28
+        // Android 8.0 (API 26) covers the Lincoln SYNC+ replacement board this build targets.
+        minSdk = 26
         targetSdk = 37
         versionCode = 26
         versionName = "0.2.7"

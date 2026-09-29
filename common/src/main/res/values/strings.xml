@@ -448,4 +448,13 @@
     <string name="adb_battery_reading">Battery: %1$d %%, %2$d km.</string>
     <string name="adb_battery_unreadable">The battery cannot be read on this car, so the iPhone is not told about an electric car.</string>
     <string name="adb_battery_reconnect">If CarPlay connected before the battery was ready, use Apply and reconnect to enable battery reporting.</string>
+    <string name="amap_navigation">Navigation projection</string>
+    <string name="amap_navigation_output">Cluster and HUD navigation</string>
+    <string name="amap_navigation_output_description">Send CarPlay navigation arrows, distance and road names to the factory cluster and HUD through the head unit\'s Amap-compatible receiver</string>
+    <string name="day_night_appearance">Day / night appearance</string>
+    <string name="day_night_auto">Follow the head unit</string>
+    <string name="day_night_day">Always day</string>
+    <string name="day_night_night">Always night</string>
+    <string name="show_session_log">Show the session log on screen</string>
+    <string name="show_session_log_description">Display the diagnostic log while CarPlay is open, for testing in the car</string>
 </resources>
