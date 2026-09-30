@@ -447,4 +447,5 @@
     <string name="show_session_log">إظهار سجل الجلسة على الشاشة</string>
     <string name="show_session_log_description">عرض سجل التشخيص أثناء فتح CarPlay للاختبار في السيارة</string>
     <string name="vpn_unavailable_on_this_head_unit">موافقة VPN غير متوفرة في وحدة الرأس هذه؛ لا يمكن بدء CarPlay السلكي</string>
+    <string name="carplay_start_failed">تعذر بدء CarPlay على وحدة الرأس هذه؛ راجع تقرير التشخيص</string>
 </resources>

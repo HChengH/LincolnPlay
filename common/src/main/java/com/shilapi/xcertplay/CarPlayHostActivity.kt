@@ -3168,6 +3168,17 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun startCarPlay(size: DisplaySize) {
+        // Last-resort guard: a head-unit-specific failure here must stay diagnosable, not fatal.
+        try {
+            performStartCarPlay(size)
+        } catch (error: Throwable) {
+            appendLog("CarPlay start failed: ${error.javaClass.simpleName}: ${error.message}")
+            setStatus(getString(R.string.carplay_start_failed))
+            Log.e(TAG, "CarPlay start failed", error)
+        }
+    }
+
+    private fun performStartCarPlay(size: DisplaySize) {
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) return
         if (shuttingDown.get() || menuOpen || handshakeResetInProgress || controller != null) return
         val controllerGeneration = restartGeneration

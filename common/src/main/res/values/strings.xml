@@ -458,4 +458,5 @@
     <string name="show_session_log">Show the session log on screen</string>
     <string name="show_session_log_description">Display the diagnostic log while CarPlay is open, for testing in the car</string>
     <string name="vpn_unavailable_on_this_head_unit">VPN consent is unavailable on this head unit; wired CarPlay cannot start</string>
+    <string name="carplay_start_failed">CarPlay could not start on this head unit; check the diagnostic report</string>
 </resources>

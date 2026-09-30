@@ -447,4 +447,5 @@
     <string name="show_session_log">Mostrar el registro en pantalla</string>
     <string name="show_session_log_description">Muestra el registro de diagnóstico con CarPlay abierto, útil para pruebas en el coche</string>
     <string name="vpn_unavailable_on_this_head_unit">El consentimiento VPN no está disponible en esta unidad; CarPlay por cable no puede iniciarse</string>
+    <string name="carplay_start_failed">CarPlay no pudo iniciarse en esta unidad; consulta el informe de diagnóstico</string>
 </resources>
