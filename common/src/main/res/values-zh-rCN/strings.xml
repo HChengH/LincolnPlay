@@ -457,4 +457,5 @@
     <string name="day_night_night">始终夜间</string>
     <string name="show_session_log">在屏幕上显示会话日志</string>
     <string name="show_session_log_description">CarPlay 打开时显示诊断日志，便于车上测试</string>
+    <string name="vpn_unavailable_on_this_head_unit">此车机缺少 VPN 授权组件，有线 CarPlay 无法启动</string>
 </resources>

@@ -446,4 +446,5 @@
     <string name="day_night_night">Всегда ночь</string>
     <string name="show_session_log">Показывать журнал на экране</string>
     <string name="show_session_log_description">Отображать журнал диагностики во время CarPlay — удобно для тестов в автомобиле</string>
+    <string name="vpn_unavailable_on_this_head_unit">Согласие VPN недоступно на этом головном устройстве; проводной CarPlay не запустится</string>
 </resources>

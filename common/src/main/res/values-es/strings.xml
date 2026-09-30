@@ -446,4 +446,5 @@
     <string name="day_night_night">Siempre noche</string>
     <string name="show_session_log">Mostrar el registro en pantalla</string>
     <string name="show_session_log_description">Muestra el registro de diagnóstico con CarPlay abierto, útil para pruebas en el coche</string>
+    <string name="vpn_unavailable_on_this_head_unit">El consentimiento VPN no está disponible en esta unidad; CarPlay por cable no puede iniciarse</string>
 </resources>

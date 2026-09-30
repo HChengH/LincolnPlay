@@ -441,7 +441,14 @@ class CarPlayHostActivity : ComponentActivity() {
         } else if (microphonePermissionResolved) {
             requestStartupPrerequisites()
         } else {
-            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+            appendLog("Requesting microphone permission")
+            // Stripped-down head-unit ROMs can lack the permission dialog; fail readably, not fatally.
+            runCatching { microphonePermission.launch(Manifest.permission.RECORD_AUDIO) }
+                .onFailure { error ->
+                    microphonePermissionResolved = true
+                    appendLog("Microphone permission dialog unavailable: ${error.message}")
+                    requestStartupPrerequisites()
+                }
         }
     }
 
@@ -504,12 +511,21 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun requestLocationPermission() {
         if (locationPermissionAvailable || awaitingLocationPermission) return
         awaitingLocationPermission = true
-        locationPermission.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-            ),
-        )
+        appendLog("Requesting location permission")
+        runCatching {
+            locationPermission.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ),
+            )
+        }.onFailure { error ->
+            awaitingLocationPermission = false
+            locationPermissionAvailable = hasFineLocationPermission()
+            if (!locationPermissionAvailable) locationReportingEnabled = false
+            appendLog("Location permission dialog unavailable: ${error.message}")
+            requestStartupPrerequisites()
+        }
     }
 
     private fun hasFineLocationPermission(): Boolean =
@@ -517,13 +533,22 @@ class CarPlayHostActivity : ComponentActivity() {
             PackageManager.PERMISSION_GRANTED
 
     private fun requestVpnConsent() {
-        val consent = CarPlayVpnService.prepare(this)
+        val consent = runCatching { CarPlayVpnService.prepare(this) }.getOrElse { error ->
+            appendLog("VPN prepare failed: ${error.message}")
+            setStatus(getString(R.string.vpn_unavailable_on_this_head_unit))
+            return
+        }
         if (consent == null) {
             vpnReady = true
             maybeStartCarPlay()
         } else {
             awaitingVpnConsent = true
-            vpnConsent.launch(consent)
+            appendLog("Requesting VPN consent")
+            runCatching { vpnConsent.launch(consent) }.onFailure { error ->
+                awaitingVpnConsent = false
+                appendLog("VPN consent dialog unavailable: ${error.message}")
+                setStatus(getString(R.string.vpn_unavailable_on_this_head_unit))
+            }
         }
     }
 
@@ -538,7 +563,14 @@ class CarPlayHostActivity : ComponentActivity() {
         wirelessPermissionsReady = false
         updateHotspotStatusBlock()
         awaitingWirelessPermissions = true
-        wirelessPermissions.launch(permissions.toTypedArray())
+        appendLog("Requesting wireless permissions")
+        runCatching { wirelessPermissions.launch(permissions.toTypedArray()) }
+            .onFailure { error ->
+                awaitingWirelessPermissions = false
+                wirelessPermissionsReady = hasRequiredWirelessPermissions()
+                appendLog("Wireless permission dialog unavailable: ${error.message}")
+                maybeStartCarPlay()
+            }
     }
 
     private fun hasRequiredWirelessPermissions(): Boolean =
