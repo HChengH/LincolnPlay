@@ -488,10 +488,6 @@
     <string name="amap_navigation">إسقاط التنقل</string>
     <string name="amap_navigation_output">التنقل على العداد وHUD</string>
     <string name="amap_navigation_output_description">إرسال أسهم التنقل والمسافة وأسماء الطرق من CarPlay إلى عداد السيارة وHUD عبر مستقبل Amap المتوافق في وحدة الرأس</string>
-    <string name="day_night_appearance">المظهر نهار / ليل</string>
-    <string name="day_night_auto">حسب وحدة الرأس</string>
-    <string name="day_night_day">نهار دائماً</string>
-    <string name="day_night_night">ليل دائماً</string>
     <string name="show_session_log">إظهار سجل الجلسة على الشاشة</string>
     <string name="show_session_log_description">عرض سجل التشخيص أثناء فتح CarPlay للاختبار في السيارة</string>
     <string name="vpn_unavailable_on_this_head_unit">موافقة VPN غير متوفرة في وحدة الرأس هذه؛ لا يمكن بدء CarPlay السلكي</string>

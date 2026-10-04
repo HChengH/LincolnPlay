@@ -523,10 +523,6 @@
     <string name="amap_navigation">导航投影</string>
     <string name="amap_navigation_output">仪表与 HUD 导航</string>
     <string name="amap_navigation_output_description">通过车机的高德协议接收组件，把 CarPlay 导航箭头、距离和路名发送到原车仪表和 HUD</string>
-    <string name="day_night_appearance">昼夜间外观</string>
-    <string name="day_night_auto">跟随车机</string>
-    <string name="day_night_day">始终白天</string>
-    <string name="day_night_night">始终夜间</string>
     <string name="show_session_log">在屏幕上显示会话日志</string>
     <string name="show_session_log_description">CarPlay 打开时显示诊断日志，便于车上测试</string>
     <string name="vpn_unavailable_on_this_head_unit">此车机缺少 VPN 授权组件，有线 CarPlay 无法启动</string>

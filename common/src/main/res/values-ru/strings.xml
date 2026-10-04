@@ -488,10 +488,6 @@
     <string name="amap_navigation">Проекция навигации</string>
     <string name="amap_navigation_output">Навигация на приборку и HUD</string>
     <string name="amap_navigation_output_description">Отправлять стрелки, расстояние и названия дорог CarPlay на заводскую приборку и HUD через совместимый с AutoNavi приёмник головного устройства</string>
-    <string name="day_night_appearance">Оформление день / ночь</string>
-    <string name="day_night_auto">Как в головном устройстве</string>
-    <string name="day_night_day">Всегда день</string>
-    <string name="day_night_night">Всегда ночь</string>
     <string name="show_session_log">Показывать журнал на экране</string>
     <string name="show_session_log_description">Отображать журнал диагностики во время CarPlay — удобно для тестов в автомобиле</string>
     <string name="vpn_unavailable_on_this_head_unit">Согласие VPN недоступно на этом головном устройстве; проводной CarPlay не запустится</string>
