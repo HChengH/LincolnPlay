@@ -495,7 +495,7 @@ class CarPlayHostActivity : ComponentActivity() {
         getSystemService(android.hardware.display.DisplayManager::class.java)
             ?.registerDisplayListener(clusterDisplayListener, mainHandler)
         initializeSessionLog()
-        lastObservedUiNight = isDarkMode(resources.configuration.uiMode)
+        nightModeOrNull(resources.configuration.uiMode)?.let { lastObservedUiNight = it }
         DiagnosticSnifferHook.line = { appendLog(it) }
         startDebugSniffer()
         logEnvironmentDiagnostics()
@@ -1164,10 +1164,11 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        val observedNight = isDarkMode(newConfig.uiMode)
-        if (observedNight != lastObservedUiNight) {
-            lastObservedUiNight = observedNight
-            appendLog("Head-unit night mode ${if (observedNight) "ON" else "OFF"}")
+        nightModeOrNull(newConfig.uiMode)?.let { observedNight ->
+            if (observedNight != lastObservedUiNight) {
+                lastObservedUiNight = observedNight
+                appendLog("Head-unit night mode ${if (observedNight) "ON" else "OFF"}")
+            }
         }
         refreshConfiguration(newConfig, ThemeModeDiagnostics.Source.CALLBACK)
         applyFullscreenMode()
