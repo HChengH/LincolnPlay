@@ -22,7 +22,7 @@
             <category android:name="android.intent.category.HOME" />
         </intent>
     </queries>
-    <application>
+    <application android:name="com.shilapi.xcertplay.DiPlayApplication">
         <provider
             android:name="com.shilapi.xcertplay.DiagnosticReportProvider"
             android:authorities="${applicationId}.diagnostic-reports"
@@ -131,6 +131,15 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/wheel_key_service" />
         </service>
+
+        <!-- Full-screen crash report in its own process; survives the dying main process. -->
+        <activity
+            android:name="com.shilapi.xcertplay.CrashReportActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:process=":crash"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Xcertplay" />
 
         <receiver
             android:name="com.shilapi.xcertplay.BootReceiver"

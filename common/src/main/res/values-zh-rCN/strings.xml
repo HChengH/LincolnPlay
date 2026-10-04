@@ -643,4 +643,10 @@
     <string name="first_tcp_timeout">等待 iPhone 接入 CarPlay 超时</string>
     <string name="wireless_startup_retries_exhausted">自动重试已停止，请检查连接后手动重试。</string>
     <string name="retry_carplay_connection">重新连接</string>
+    <string name="crash_report_title">DiPlay 异常停止</string>
+    <string name="crash_report_hint">长按选中下方文字即可复制，粘贴到消息里发回。同样的内容也已保存在诊断报告中。</string>
+    <string name="crash_report_copy">复制全部</string>
+    <string name="crash_report_restart">重启 DiPlay</string>
+    <string name="crash_report_close_hint">重启或离开此页面后报告关闭。</string>
+    <string name="crash_report_copied">已复制</string>
 </resources>

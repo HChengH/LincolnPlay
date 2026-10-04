@@ -600,4 +600,10 @@
     <string name="wheel_key_service_description">Позволяет DiPlay использовать выбранные в настройках кнопки руля для масштаба карты CarPlay на приборной панели и для перемещения по экрану CarPlay. Только получает нажатия кнопок и не читает экран.</string>
     <string name="cluster_song_on_change">Песня только при смене</string>
     <string name="cluster_song_on_change_description">Новая песня видна на приборной панели 5 секунд, затем карточка очищается. Пауза и продолжение её не показывают.</string>
+    <string name="crash_report_title">DiPlay неожиданно остановился</string>
+    <string name="crash_report_hint">Выделите текст ниже, чтобы скопировать его, и вставьте в сообщение. Те же сведения сохранены в диагностическом отчёте.</string>
+    <string name="crash_report_copy">Копировать всё</string>
+    <string name="crash_report_restart">Перезапустить DiPlay</string>
+    <string name="crash_report_close_hint">Отчёт закроется после перезапуска или ухода с этого экрана.</string>
+    <string name="crash_report_copied">Скопировано</string>
 </resources>

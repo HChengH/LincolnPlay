@@ -643,4 +643,10 @@
     <string name="first_tcp_timeout">The iPhone did not connect to CarPlay in time</string>
     <string name="wireless_startup_retries_exhausted">Automatic retries stopped. Check the connection and retry manually.</string>
     <string name="retry_carplay_connection">Retry connection</string>
+    <string name="crash_report_title">DiPlay stopped unexpectedly</string>
+    <string name="crash_report_hint">Select the text below to copy it, then paste it into a message. The same details are saved in the diagnostic report.</string>
+    <string name="crash_report_copy">Copy all</string>
+    <string name="crash_report_restart">Restart DiPlay</string>
+    <string name="crash_report_close_hint">The report closes when you restart or leave this screen.</string>
+    <string name="crash_report_copied">Copied</string>
 </resources>

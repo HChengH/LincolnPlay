@@ -600,4 +600,10 @@
     <string name="wheel_key_service_description">Permite a DiPlay usar los botones del volante elegidos en sus ajustes para hacer zoom en el mapa de CarPlay del panel de instrumentos y moverse por la pantalla de CarPlay. Solo recibe pulsaciones de botones y no lee la pantalla.</string>
     <string name="cluster_song_on_change">Canción solo al cambiar</string>
     <string name="cluster_song_on_change_description">Una canción nueva se muestra en el cuadro durante 5 segundos y luego la tarjeta se vacía. Pausar y reanudar no la vuelven a mostrar.</string>
+    <string name="crash_report_title">DiPlay se detuvo inesperadamente</string>
+    <string name="crash_report_hint">Selecciona el texto de abajo para copiarlo y pégalo en un mensaje. Los mismos datos se guardan en el informe de diagnóstico.</string>
+    <string name="crash_report_copy">Copiar todo</string>
+    <string name="crash_report_restart">Reiniciar DiPlay</string>
+    <string name="crash_report_close_hint">El informe se cierra al reiniciar o salir de esta pantalla.</string>
+    <string name="crash_report_copied">Copiado</string>
 </resources>
