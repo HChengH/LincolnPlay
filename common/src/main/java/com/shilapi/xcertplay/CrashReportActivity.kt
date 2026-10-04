@@ -17,6 +17,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import com.shilapi.xcertplay.host.R
 
 /**
  * Full-screen crash report shown in the :crash process. The text is selectable so it can be
