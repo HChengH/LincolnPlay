@@ -214,6 +214,33 @@ class AirPlayInfoPlistTest {
     }
 
     @Test
+    fun voicePromptFormatsAdvertiseWidebandPcmOnly() {
+        val base = AirPlayConfig(
+            deviceName = "test",
+            deviceId = "02:00:00:00:00:02",
+            btMac = "02:00:00:00:00:02",
+            sourceVersion = "366.0",
+            main = AirPlayDisplayConfig(widthPixels = 1280, heightPixels = 720),
+        )
+
+        fun outputFormats(info: Map<String, Any?>, type: Int, audioType: String): Int =
+            (info["audioFormats"] as List<*>)
+                .map { it as Map<*, *> }
+                .single { it["type"] == type && it["audioType"] == audioType }["audioOutputFormats"] as Int
+
+        val info = AirPlayInfoPlist.build(base)
+        // The 8/12 kHz pairs (0x3c) must stay unadvertised for spoken prompts so senders
+        // cannot pick the narrowband voice rate; the 16/24 kHz pairs (0x3c0) remain.
+        listOf(100 to "default", 100 to "alert", 101 to "default").forEach { (type, audioType) ->
+            val mask = outputFormats(info, type, audioType)
+            assertEquals(0, mask and 0x3c)
+            assertEquals(0x3c0, mask and 0x3fc)
+        }
+        assertEquals(0x3fc, outputFormats(info, 100, "compatibility") and 0x3fc)
+        assertEquals(0x3fc, outputFormats(info, 100, "media") and 0x3fc)
+    }
+
+    @Test
     fun mainAltAndHighAudioStreamsAreDeclared() {
         val info = AirPlayInfoPlist.build(
             AirPlayConfig(

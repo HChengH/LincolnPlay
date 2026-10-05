@@ -132,7 +132,14 @@ object AirPlayInfoPlist {
 
         val is48 = entertainmentRate == 48000
         val pcmVoice = 0x3fc
+        // Spoken prompts (default/alert) advertise wideband PCM only: bits 6-9 are the
+        // 16/24 kHz mono+stereo pairs, while 0x3c covers the 8/12 kHz pairs senders
+        // otherwise pick for voice types. An 8 kHz prompt stream is what the guidance
+        // usage chain muffles on non-BYD boards - the dongle's clear prompts imply its
+        // firmware never offers the low-rate bits either.
+        val pcmVoiceWide = 0x3c0
         val pcm = pcmVoice or (if (is48) 0xc000 else 0xc00)
+        val pcmWide = pcmVoiceWide or (if (is48) 0xc000 else 0xc00)
         val pcmMono = 0x154 or (if (is48) 0x4000 else 0x400)
         val opus = 0x70000000
         val aacLc = if (is48) 0x800000 else 0x400000
@@ -142,12 +149,12 @@ object AirPlayInfoPlist {
         return listOf(
             format(100, "compatibility", pcm, pcmInput),
             format(101, "compatibility", pcm),
-            format(100, "default", pcm or opus, wirelessInput),
-            format(100, "alert", pcm or opus),
+            format(100, "default", pcmWide or opus, wirelessInput),
+            format(100, "alert", pcmWide or opus),
             format(100, "media", pcm),
             format(100, "telephony", pcmMono or opus, wirelessInput),
             format(100, "speechRecognition", pcmMono or opus, wirelessInput),
-            format(101, "default", pcm or opus),
+            format(101, "default", pcmWide or opus),
             format(102, "media", aacLc),
         )
     }
