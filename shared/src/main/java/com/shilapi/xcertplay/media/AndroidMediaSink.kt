@@ -189,8 +189,9 @@ class AndroidMediaSink(
     private val onMediaAudioChanged: (Boolean) -> Unit = {},
     /** Guidance ducking depth for media PCM, as a fraction of full volume. */
     private val guidanceDuckGain: () -> Float = { 0.12f },
-    /** AudioAttributes usage for the guidance track; selectable per board quirks. */
-    private val guidanceUsage: () -> Int = { AudioAttributes.USAGE_MEDIA },
+    /** Guidance track (usage, contentType) preset; mirrors the dongle app's vendor presets. */
+    private val guidanceAttributes: () -> Pair<Int, Int> =
+        { AudioAttributes.USAGE_MEDIA to AudioAttributes.CONTENT_TYPE_MUSIC },
 ) : MediaSink {
     private val appContext = context?.applicationContext
     private val audioManager = appContext?.getSystemService(AudioManager::class.java)
@@ -1194,10 +1195,15 @@ private class AudioRenderer(
     }
 
     private fun audioAttributesFor(selection: AudioChannelSelection): AudioAttributes =
-        AudioAttributes.Builder()
-            .setUsage(usageFor(selection.channel))
-            .setContentType(contentTypeFor(selection.contentType))
-            .build()
+        if (selection.channel == AudioChannel.NAVIGATION) {
+            val (usage, contentType) = guidanceAttributes()
+            AudioAttributes.Builder().setUsage(usage).setContentType(contentType).build()
+        } else {
+            AudioAttributes.Builder()
+                .setUsage(usageFor(selection.channel))
+                .setContentType(contentTypeFor(selection.contentType))
+                .build()
+        }
 
     /**
      * Shares a sink-level focus request across all active non-navigation renderers.
@@ -1247,9 +1253,7 @@ private class AudioRenderer(
         // VOICE_COMMUNICATION (tengshi preset "02"); match the empirically working choice.
         AudioChannel.PHONE -> AudioAttributes.USAGE_NOTIFICATION_RINGTONE
         AudioChannel.ASSISTANT -> AudioAttributes.USAGE_ASSISTANT
-        // Media (1) stays clear on this ROM while the native guidance usage applies
-        // voice-chain processing (muffled); selectable because media shares one volume bus.
-        AudioChannel.NAVIGATION -> guidanceUsage()
+        AudioChannel.NAVIGATION -> AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
     }
 
     private fun contentTypeFor(contentType: AudioContentType): Int = when (contentType) {

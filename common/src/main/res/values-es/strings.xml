@@ -611,9 +611,10 @@
     <string name="duck_depth_default">Predeterminado (12% de volumen)</string>
     <string name="duck_depth_deep">Profundo (6% de volumen)</string>
     <string name="guidance_audio_channel">Canal de indicaciones de navegación</string>
-    <string name="guidance_usage_media">Bus de medios (claro, volumen compartido)</string>
-    <string name="guidance_usage_notification">Notificación</string>
-    <string name="guidance_usage_event">Evento de notificación</string>
-    <string name="guidance_usage_assistant">Asistente</string>
-    <string name="guidance_usage_native">Navegación nativa (apagado aquí)</string>
+    <string name="guidance_preset_media">Bus de medios (claro aquí, volumen compartido)</string>
+    <string name="guidance_preset_01">Preset del dongle 01 (default)</string>
+    <string name="guidance_preset_02">Preset del dongle 02 (tengshi)</string>
+    <string name="guidance_preset_03">Preset del dongle 03 (jili)</string>
+    <string name="guidance_preset_04">Preset del dongle 04 (hengchen)</string>
+    <string name="guidance_preset_05">Preset del dongle 05 (dfrc, tu elección)</string>
 </resources>

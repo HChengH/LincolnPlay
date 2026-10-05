@@ -654,9 +654,10 @@
     <string name="duck_depth_default">Default (12% volume)</string>
     <string name="duck_depth_deep">Deep (6% volume)</string>
     <string name="guidance_audio_channel">Navigation prompt channel</string>
-    <string name="guidance_usage_media">Media bus (clear, shared volume)</string>
-    <string name="guidance_usage_notification">Notification</string>
-    <string name="guidance_usage_event">Notification event</string>
-    <string name="guidance_usage_assistant">Assistant</string>
-    <string name="guidance_usage_native">Native guidance (muffled here)</string>
+    <string name="guidance_preset_media">Media bus (clear here, shared volume)</string>
+    <string name="guidance_preset_01">Dongle preset 01 (default)</string>
+    <string name="guidance_preset_02">Dongle preset 02 (tengshi)</string>
+    <string name="guidance_preset_03">Dongle preset 03 (jili)</string>
+    <string name="guidance_preset_04">Dongle preset 04 (hengchen)</string>
+    <string name="guidance_preset_05">Dongle preset 05 (dfrc, your tuned choice)</string>
 </resources>

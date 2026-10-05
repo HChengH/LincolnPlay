@@ -611,9 +611,10 @@
     <string name="duck_depth_default">افتراضي (12% من مستوى الصوت)</string>
     <string name="duck_depth_deep">عميق (6% من مستوى الصوت)</string>
     <string name="guidance_audio_channel">قناة إرشادات التنقل</string>
-    <string name="guidance_usage_media">ناقل الوسائط (نقي، مستوى صوت مشترك)</string>
-    <string name="guidance_usage_notification">إشعار</string>
-    <string name="guidance_usage_event">حدث إشعار</string>
-    <string name="guidance_usage_assistant">المساعد</string>
-    <string name="guidance_usage_native">تنقل أصلي (مكتوم هنا)</string>
+    <string name="guidance_preset_media">ناقل الوسائط (نقي هنا، مستوى صوت مشترك)</string>
+    <string name="guidance_preset_01">إعداد الصندوق 01 (default)</string>
+    <string name="guidance_preset_02">إعداد الصندوق 02 (tengshi)</string>
+    <string name="guidance_preset_03">إعداد الصندوق 03 (jili)</string>
+    <string name="guidance_preset_04">إعداد الصندوق 04 (hengchen)</string>
+    <string name="guidance_preset_05">إعداد الصندوق 05 (dfrc، اختيارك)</string>
 </resources>

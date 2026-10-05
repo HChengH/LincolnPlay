@@ -3626,6 +3626,16 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun normalizedModel(): String =
         model.trim().ifBlank { AirPlayPersistence.DEFAULT_MODEL }
 
+    /** Dongle preset table: media bus plus vendor presets 01..05 as (usage, contentType). */
+    private fun guidanceAttributesForPreset(preset: Int): Pair<Int, Int> = when (preset) {
+        1 -> 12 to 2   // dongle 01 default
+        2 -> 10 to 2   // dongle 02 tengshi
+        3 -> 17 to 5   // dongle 03 jili
+        4 -> 5 to 2    // dongle 04 hengchen
+        5 -> 12 to 1   // dongle 05 dfrc (the user's tuned choice)
+        else -> 1 to 2 // media bus, clear on this ROM
+    }
+
     private fun createMediaSink(
         videoWidth: Int,
         videoHeight: Int,
@@ -3657,7 +3667,7 @@ class CarPlayHostActivity : ComponentActivity() {
             },
             onMediaAudioChanged = CarPlayMediaKeys::onMediaAudioChanged,
             guidanceDuckGain = { AirPlayPersistence.loadGuidanceDuckPercent(this) / 100f },
-            guidanceUsage = { AirPlayPersistence.loadGuidanceAudioUsage(this) },
+            guidanceAttributes = { guidanceAttributesForPreset(AirPlayPersistence.loadGuidanceAudioPreset(this)) },
         )
     }
 
