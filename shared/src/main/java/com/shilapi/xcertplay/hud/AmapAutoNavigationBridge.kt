@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -108,18 +109,36 @@ internal object AmapAutoNavigationBridge {
         putExtra("EXTRA_STATE", 0)
         putExtra("EXTRA_IS_FOREGROUND", 0)
         putExtra("NEW_ICON", frame.icon)
+        // AmapAuto sends both the new and legacy icon spellings; a fixed-format cluster
+        // widget may read either (ours rendered distance but not the arrow until both went out).
+        putExtra("ICON", frame.icon)
+        putExtra("addIcon", 0)
         putExtra("ROUNG_ABOUT_NUM", frame.roundaboutExit)
         putExtra("SEG_REMAIN_DIS", frame.distanceMeters)
+        putExtra("SEG_REMAIN_DIS_AUTO", autoDistance(frame.distanceMeters))
+        putExtra("SEG_REMAIN_TIME", -1)
+        putExtra("CUR_ROAD_NAME", frame.road)
         putExtra("NEXT_ROAD_NAME", frame.road)
+        putExtra("NEXT_NEXT_ROAD_NAME", "")
         putExtra("ROUTE_REMAIN_DIS", frame.routeRemainingMeters)
         putExtra("ROUTE_REMAIN_TIME", frame.routeRemainingSeconds)
     }
+
+    /** AmapAuto's AUTO formatting: "123,m" below a kilometre, "1.5,km" above. */
+    private fun autoDistance(meters: Int): String =
+        if (meters in 0..999) "$meters,m" else {
+            val km = meters / 1000.0
+            if (km >= 10) "${km.toInt()},km" else String.format(Locale.US, "%.1f,km", km)
+        }
 
     fun endIntent(): Intent = baseIntent(KEY_STATE).apply {
         putExtra("EXTRA_STATE", STATE_ENDED)
         putExtra("EXTRA_IS_FOREGROUND", 1)
         putExtra("NEW_ICON", -1)
+        putExtra("ICON", -1)
         putExtra("SEG_REMAIN_DIS", -1)
+        putExtra("SEG_REMAIN_DIS_AUTO", "")
+        putExtra("CUR_ROAD_NAME", "")
         putExtra("NEXT_ROAD_NAME", "")
         putExtra("ROUTE_REMAIN_DIS", -1)
         putExtra("ROUTE_REMAIN_TIME", -1)

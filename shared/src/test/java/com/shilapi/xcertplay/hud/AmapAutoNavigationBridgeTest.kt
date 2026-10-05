@@ -20,8 +20,11 @@ class AmapAutoNavigationBridgeTest {
         assertEquals("AUTONAVI_STANDARD_BROADCAST_SEND", intent.action)
         assertEquals(10001, intent.getIntExtra("KEY_TYPE", -1))
         assertEquals(2, intent.getIntExtra("NEW_ICON", -1)) // Apple type 1 -> Amap LEFT
+        assertEquals(2, intent.getIntExtra("ICON", -1)) // legacy spelling goes out too
         assertEquals(250, intent.getIntExtra("SEG_REMAIN_DIS", -1))
+        assertEquals("250,m", intent.getStringExtra("SEG_REMAIN_DIS_AUTO"))
         assertEquals("Main Street", intent.getStringExtra("NEXT_ROAD_NAME"))
+        assertEquals("Main Street", intent.getStringExtra("CUR_ROAD_NAME"))
         assertEquals(0, intent.getIntExtra("ROUNG_ABOUT_NUM", -1))
         assertFalse(intent.hasExtra("IS_BYD_MAP"))
     }
