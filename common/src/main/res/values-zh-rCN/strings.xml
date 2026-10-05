@@ -653,4 +653,10 @@
     <string name="duck_depth_light">轻度（保留25%音量）</string>
     <string name="duck_depth_default">默认（保留12%音量）</string>
     <string name="duck_depth_deep">深度（保留6%音量）</string>
+    <string name="guidance_audio_channel">导航提示音通道</string>
+    <string name="guidance_usage_media">媒体总线（音质清亮，音量与音乐共用）</string>
+    <string name="guidance_usage_notification">通知</string>
+    <string name="guidance_usage_event">通知事件</string>
+    <string name="guidance_usage_assistant">语音助手</string>
+    <string name="guidance_usage_native">原生导航（本机会发闷）</string>
 </resources>

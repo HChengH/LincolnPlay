@@ -189,6 +189,8 @@ class AndroidMediaSink(
     private val onMediaAudioChanged: (Boolean) -> Unit = {},
     /** Guidance ducking depth for media PCM, as a fraction of full volume. */
     private val guidanceDuckGain: () -> Float = { 0.12f },
+    /** AudioAttributes usage for the guidance track; selectable per board quirks. */
+    private val guidanceUsage: () -> Int = { AudioAttributes.USAGE_MEDIA },
 ) : MediaSink {
     private val appContext = context?.applicationContext
     private val audioManager = appContext?.getSystemService(AudioManager::class.java)
@@ -1245,11 +1247,9 @@ private class AudioRenderer(
         // VOICE_COMMUNICATION (tengshi preset "02"); match the empirically working choice.
         AudioChannel.PHONE -> AudioAttributes.USAGE_NOTIFICATION_RINGTONE
         AudioChannel.ASSISTANT -> AudioAttributes.USAGE_ASSISTANT
-        // The dongle's audioGeneralConfig default plays prompts on the MEDIA bus (usage 1),
-        // and its guidance sounds clear on this board; this ROM's guidance usage audibly
-        // muffles the stream (voice-chain processing). PCM ducking does not need usage
-        // separation, so follow the dongle default.
-        AudioChannel.NAVIGATION -> AudioAttributes.USAGE_MEDIA
+        // Media (1) stays clear on this ROM while the native guidance usage applies
+        // voice-chain processing (muffled); selectable because media shares one volume bus.
+        AudioChannel.NAVIGATION -> guidanceUsage()
     }
 
     private fun contentTypeFor(contentType: AudioContentType): Int = when (contentType) {

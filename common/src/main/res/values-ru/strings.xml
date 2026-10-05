@@ -610,4 +610,10 @@
     <string name="duck_depth_light">Слабо (25% громкости)</string>
     <string name="duck_depth_default">По умолчанию (12% громкости)</string>
     <string name="duck_depth_deep">Сильно (6% громкости)</string>
+    <string name="guidance_audio_channel">Канал голосовых подсказок</string>
+    <string name="guidance_usage_media">Шина медиа (чисто, общая громкость)</string>
+    <string name="guidance_usage_notification">Уведомление</string>
+    <string name="guidance_usage_event">Событие уведомления</string>
+    <string name="guidance_usage_assistant">Ассистент</string>
+    <string name="guidance_usage_native">Штатный навигационный (здесь глухо)</string>
 </resources>

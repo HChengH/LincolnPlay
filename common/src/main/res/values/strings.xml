@@ -653,4 +653,10 @@
     <string name="duck_depth_light">Light (25% volume)</string>
     <string name="duck_depth_default">Default (12% volume)</string>
     <string name="duck_depth_deep">Deep (6% volume)</string>
+    <string name="guidance_audio_channel">Navigation prompt channel</string>
+    <string name="guidance_usage_media">Media bus (clear, shared volume)</string>
+    <string name="guidance_usage_notification">Notification</string>
+    <string name="guidance_usage_event">Notification event</string>
+    <string name="guidance_usage_assistant">Assistant</string>
+    <string name="guidance_usage_native">Native guidance (muffled here)</string>
 </resources>

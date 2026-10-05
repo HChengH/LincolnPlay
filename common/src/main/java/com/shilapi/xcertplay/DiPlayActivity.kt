@@ -579,6 +579,16 @@ class DiPlayActivity : ComponentActivity() {
             ), duckPresets.indexOf(AirPlayPersistence.loadGuidanceDuckPercent(this)).coerceAtLeast(0), reconnects = false) {
                 AirPlayPersistence.saveGuidanceDuckPercent(this, duckPresets[it])
             }
+            val usagePresets = listOf(1, 5, 10, 16, 12)
+            choice(card, getString(R.string.guidance_audio_channel), listOf(
+                getString(R.string.guidance_usage_media),
+                getString(R.string.guidance_usage_notification),
+                getString(R.string.guidance_usage_event),
+                getString(R.string.guidance_usage_assistant),
+                getString(R.string.guidance_usage_native),
+            ), usagePresets.indexOf(AirPlayPersistence.loadGuidanceAudioUsage(this)).coerceAtLeast(0)) {
+                AirPlayPersistence.saveGuidanceAudioUsage(this, usagePresets[it])
+            }
         }
         section(content, getString(R.string.amap_navigation), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.amap_navigation_output),
