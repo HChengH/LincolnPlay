@@ -214,6 +214,15 @@ class CarPlayController(
 
     /** Device node handed to the vendor request; a different node means a real re-enumeration. */
     private var reenumerationSourceDeviceName: String? = null
+    private var reenumerationStartedNanos = 0L
+
+    /**
+     * True once this controller opened wired data paths. A fresh physical plug-in exposes a clean
+     * CarPlay configuration and must be used directly (this iPhone ignores the vendor
+     * re-enumeration request, which stranded bring-up in WaitingForReenumeration); only a
+     * reconnect inside the same run can see a stale leftover configuration.
+     */
+    private var openedWiredDataPaths = false
     private var lastReportedStatus: CarPlayStatus? = null
     private var mfiResetLogged = false
 
@@ -1732,9 +1741,10 @@ class CarPlayController(
                                 }}",
                         )
                         when {
-                            // A leftover configuration cannot be trusted (see reenumerationPerformed),
-                            // so drive the phone through the vendor request to get a clean device.
-                            configuration != null && !reenumerationPerformed &&
+                            // Only a reconnect within this run can see a stale leftover
+                            // configuration (see openedWiredDataPaths); a fresh plug-in exposes a
+                            // clean one and must be used directly.
+                            configuration != null && !reenumerationPerformed && openedWiredDataPaths &&
                                 reenumerationAttempts < MAXIMUM_REENUMERATION_ATTEMPTS -> {
                                 debugLog(
                                     "wired USB already exposes a CarPlay configuration from an " +
@@ -1794,6 +1804,7 @@ class CarPlayController(
         phase = Phase.REENUMERATION
         reenumerationAttempts += 1
         reenumerationPerformed = true
+        reenumerationStartedNanos = System.nanoTime()
         // Remember which device node we asked the phone to leave. Only a *different* node proves
         // the re-enumeration really happened; reusing the same node is the stale state that makes
         // the USBMUX handshake time out.
@@ -1826,11 +1837,30 @@ class CarPlayController(
                 if (generation != availabilityPollGeneration.get()) return@postDelayed
                 val replacement = iphoneHost.discover()
                     .firstOrNull { it.deviceName != reenumerationSourceDeviceName }
-                if (replacement != null) {
-                    debugLog("wired re-enumerated iPhone appeared; requesting USB access")
-                    requestIphonePermission(replacement)
-                } else {
-                    scheduleReenumerationPoll()
+                when {
+                    replacement != null -> {
+                        debugLog("wired re-enumerated iPhone appeared; requesting USB access")
+                        requestIphonePermission(replacement)
+                    }
+                    // The phone can ignore the vendor re-enumeration request (seen on this
+                    // build): rather than waiting forever, fall back to the still-attached
+                    // device once it exposes a CarPlay configuration.
+                    System.nanoTime() - reenumerationStartedNanos >=
+                        REENUMERATION_FALLBACK_MILLIS * 1_000_000L -> {
+                        val stillAttached = iphoneHost.discover()
+                            .firstOrNull { it.deviceName == reenumerationSourceDeviceName }
+                            ?.takeIf { IphoneCarPlayConfiguration.find(it) != null }
+                        if (stillAttached != null) {
+                            debugLog(
+                                "wired re-enumeration produced no new device; reusing the " +
+                                    "attached iPhone as a fallback",
+                            )
+                            requestIphonePermission(stillAttached)
+                        } else {
+                            scheduleReenumerationPoll()
+                        }
+                    }
+                    else -> scheduleReenumerationPoll()
                 }
             },
             REENUMERATION_POLL_INTERVAL_MILLIS,
@@ -1864,6 +1894,7 @@ class CarPlayController(
     }
 
     private fun openDataPaths(device: UsbDevice) {
+        openedWiredDataPaths = true
         val generation = wiredGeneration.get()
         phase = Phase.DATAPATHS
         debugLog("wired opening iPhone USB data paths")
@@ -2684,6 +2715,7 @@ class CarPlayController(
         private const val RFCOMM_CONNECT_TIMEOUT_MILLIS = 15_000L
         private const val MAXIMUM_REENUMERATION_ATTEMPTS = 2
         private const val REENUMERATION_POLL_INTERVAL_MILLIS = 400L
+        private const val REENUMERATION_FALLBACK_MILLIS = 8_000L
         private const val EXECUTOR_CLOSE_TIMEOUT_MILLIS = 2_000L
         private const val ADAPTER_ADDRESS_PLACEHOLDER = "02:00:00:00:00:00"
         private val BLUETOOTH_ADDRESS = Regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
