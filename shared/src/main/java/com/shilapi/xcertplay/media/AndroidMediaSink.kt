@@ -312,7 +312,10 @@ class AndroidMediaSink(
     }
 
     override fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) {
-        if (mapsToOverlayChannel(format)) audioFocusCoordinator.overlay(true)
+        if (mapsToOverlayChannel(format)) {
+            audioFocusCoordinator.overlay(true)
+            applyOverlayGain(true)
+        }
         audioRenderer(id, format).start()
         if (format.audioType == "media") updateMediaAudio(id, true)
     }
@@ -325,7 +328,10 @@ class AndroidMediaSink(
         val renderer = audioRenderers.remove(id)
         val wasOverlay = renderer != null && mapsToOverlayChannel(renderer.format)
         renderer?.close()
-        if (wasOverlay) audioFocusCoordinator.overlay(false)
+        if (wasOverlay) {
+            audioFocusCoordinator.overlay(false)
+            applyOverlayGain(false)
+        }
         updateMediaAudio(id, false)
     }
 
@@ -342,6 +348,22 @@ class AndroidMediaSink(
             mode = mode,
         ).channel
         return channel == AudioChannel.NAVIGATION || channel == AudioChannel.ASSISTANT
+    }
+
+    /**
+     * PCM-level ducking for boards whose AudioTrack ignores setStereoVolume (this one reports
+     * success but never attenuates). Scales the media renderer's samples directly.
+     */
+    private fun applyOverlayGain(active: Boolean) {
+        val target = if (active) 0.25f else 1f
+        var ducked = 0
+        for (renderer in audioRenderers.values) {
+            if (renderer.channel() == AudioChannel.MEDIA) {
+                renderer.setGain(target)
+                ducked++
+            }
+        }
+        runCatching { onAudioDiagnostic("Audio: pcm gain ${if (active) "duck" else "restore"} renderers=$ducked") }
     }
 
     private fun updateMediaAudio(id: AudioStreamId, active: Boolean) {
@@ -1401,6 +1423,7 @@ private class AudioRenderer(
             applyFadeIn(data, offset, length)
             fadeApplied = true
         }
+        if (gain < 1f) applyGain(data, offset, length)
         var written = 0
         while (written < length && running) {
             val writeLength = if (playbackStarted) {
@@ -1519,6 +1542,30 @@ private class AudioRenderer(
         runCatching { report("Audio: renderer failed api=${Build.VERSION.SDK_INT} " +
             "audioType=${format.audioType} codec=${format.codec} stage=$diagnosticStage " +
             MediaFailureSummary.describe(error)) }
+    }
+
+    /**
+     * Per-track ducking gain. This ROM's AudioTrack reports success from setStereoVolume but
+     * ignores it, so guidance ducking is enforced by scaling the PCM samples themselves.
+     */
+    @Volatile private var gain = 1f
+
+    fun setGain(value: Float) {
+        gain = value.coerceIn(0f, 1f)
+    }
+
+    fun channel(): AudioChannel? = mappedChannel
+
+    private fun applyGain(data: ByteArray, offset: Int, length: Int) {
+        val end = offset + (length - length % 2)
+        var position = offset
+        while (position < end) {
+            val sample = (data[position].toInt() and 0xff) or (data[position + 1].toInt() shl 8)
+            val scaled = (sample * gain).toInt().coerceIn(-32768, 32767)
+            data[position] = scaled.toByte()
+            data[position + 1] = (scaled shr 8).toByte()
+            position += 2
+        }
     }
 
     private fun applyFadeIn(data: ByteArray, offset: Int, length: Int) {

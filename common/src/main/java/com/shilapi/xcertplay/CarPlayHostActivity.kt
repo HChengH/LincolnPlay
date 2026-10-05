@@ -1076,8 +1076,8 @@ class CarPlayHostActivity : ComponentActivity() {
         // This board's decoder maps the steering-wheel track buttons to custom keycodes that
         // Android does not route to media sessions; captured on the car: 297 = previous, 298 = next.
         val wheelMediaIndex = when (event.keyCode) {
-            WHEEL_KEY_PREVIOUS -> CarPlayMediaButton.PREVIOUS
-            WHEEL_KEY_NEXT -> CarPlayMediaButton.NEXT
+            WHEEL_KEY_PREVIOUS, CONSOLE_KEY_SEEK_LEFT -> CarPlayMediaButton.PREVIOUS
+            WHEEL_KEY_NEXT, CONSOLE_KEY_SEEK_RIGHT -> CarPlayMediaButton.NEXT
             else -> null
         }
         if (wheelMediaIndex != null) {
@@ -4685,6 +4685,9 @@ class CarPlayHostActivity : ComponentActivity() {
         const val TAG = "xcertplay-usb"
         // Steering-wheel track buttons on the freescale MEK-MX8Q board (captured on the car).
         private const val WHEEL_KEY_PREVIOUS = 297
+        // Console seek buttons (AOSP KEYCODE_SEEK_LEFT/RIGHT names exist from API 31; literals for minSdk 26).
+        private const val CONSOLE_KEY_SEEK_LEFT = 294
+        private const val CONSOLE_KEY_SEEK_RIGHT = 295
         private const val WHEEL_KEY_NEXT = 298
         const val SCREEN_TYPE_MAIN = 110
         const val SCREEN_TYPE_ALT = 111
