@@ -121,6 +121,7 @@ sealed class CarPlayStatus {
     data object ConnectingBluetooth : CarPlayStatus()
     data object RunningWireless : CarPlayStatus()
     data object WirelessActive : CarPlayStatus()
+    data object WirelessActiveFallback : CarPlayStatus()
     data object DiscoveringIphone : CarPlayStatus()
     data object WaitingForIphone : CarPlayStatus()
     data object RequestingIphonePermission : CarPlayStatus()
@@ -178,18 +179,20 @@ class CarPlayController(
     private val appContext = context.applicationContext
     private val diagnosticAttempt = diagnosticAttempts.incrementAndGet()
     private val diagnosticRun = AtomicInteger()
-    private val usbManager = context.getSystemService(UsbManager::class.java)
+    private val usbManager: UsbManager? = context.getSystemService(UsbManager::class.java)
     private val bluetoothAdapter =
         appContext.getSystemService(BluetoothManager::class.java)?.adapter
-    private val iphoneHost = IphoneUsbHost(
-        appContext,
-        usbManager,
-        if (config.iphoneDevices.isNotEmpty()) {
-            IphoneUsbMatcher(config.iphoneDevices)
-        } else {
-            IphoneUsbMatcher.appleVendor()
-        },
-    )
+    private val iphoneHost by lazy {
+        IphoneUsbHost(
+            appContext,
+            requireUsbManager(),
+            if (config.iphoneDevices.isNotEmpty()) {
+                IphoneUsbMatcher(config.iphoneDevices)
+            } else {
+                IphoneUsbMatcher.appleVendor()
+            },
+        )
+    }
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val touchExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val transientTouches = TransientTouchCoalescer(touchExecutor) { contacts ->
@@ -338,7 +341,7 @@ class CarPlayController(
         override fun onSessionEnded(session: AirPlaySession) {
             if (activeSession === session) {
                 activeSession = null
-                BydNavigationOutputs.endNow()
+                BydNavigationOutputs.endNow(preserveTurnOverlay = !closed && config.transport == CarPlayTransport.WIRELESS)
                 com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(false)
                 videoListener?.onVideoSessionEnded()
                 synchronized(playbackStatus) {
@@ -444,6 +447,7 @@ class CarPlayController(
             if (closed) return
         }
         connectionDiagnostic("start transport=${config.transport}")
+        if (!hasRequiredUsbService()) return
         videoListener?.let { listener ->
             videoGate = VideoInCarGate(
                 readParked = listener::readParked,
@@ -490,6 +494,23 @@ class CarPlayController(
         return try {
             if (transient) transientTouches.offer(contacts) else {
                 touchExecutor.execute { session.sendTouch(contacts) }
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Moves CarPlay on the main screen to its declared view area [index], for example another dock edge. */
+    fun showViewArea(index: Int): Boolean {
+        if (closed) return false
+        val session = activeSession ?: return false
+        val token = session.mainScreenSessionToken() ?: return false
+        return try {
+            touchExecutor.execute {
+                if (!closed && activeSession === session && session.mainScreenSessionToken() === token) {
+                    debugLog("View area $index sent=${session.showViewArea(index)}")
+                }
             }
             true
         } catch (_: Exception) {
@@ -756,6 +777,7 @@ class CarPlayController(
     }
 
     private fun startMfi() {
+        if (!hasRequiredUsbService()) return
         availabilityPollGeneration.incrementAndGet()
         phase = Phase.MFI
         onStatus(CarPlayStatus.DiscoveringMfi)
@@ -766,7 +788,7 @@ class CarPlayController(
                 debugLog("mfi discovery backend=CH341 devices=${config.ch341Devices}")
                 val host = ch341Host ?: Ch341UsbHost(
                     appContext,
-                    usbManager,
+                    requireUsbManager(),
                     Ch341DeviceMatcher(config.ch341Devices),
                 ).also {
                     ch341Host = it
@@ -902,7 +924,7 @@ class CarPlayController(
         val check = object : Runnable {
             override fun run() {
                 if (closed || phase != Phase.MFI || generation != permissionPollGeneration) return
-                if (usbManager.hasPermission(device)) {
+                if (requireUsbManager().hasPermission(device)) {
                     onCh341Permission(Ch341UsbHost.PermissionResult.Granted(device))
                     return
                 }
@@ -1528,6 +1550,8 @@ class CarPlayController(
                     it.close()
                 }
                 wirelessConnectionProof.activate(generation, session)
+                // Keep wirelessActiveReported false until maybeCompleteWirelessHandoff() closes
+                // the Bluetooth bootstrap after the tunneled iAP2 channel is ready.
                 sessionListener.onSessionActive(session)
             }
 
@@ -1618,32 +1642,7 @@ class CarPlayController(
                 }
                 debugLog("wireless handoff timed out waiting for tunnel iAP2 readiness")
                 Thread(
-                    {
-                        if (
-                            closed ||
-                            phase != Phase.WIRELESS ||
-                            generation != wirelessGeneration.get() ||
-                            wirelessActiveReported.get()
-                        ) {
-                            return@Thread
-                        }
-                        if (wirelessConnectionProof.hasRenderedFrame(generation)) {
-                            // Some iPhones/firmware combinations establish video but never
-                            // request the type-130 iAP2 tunnel. Do not tear down a proven live
-                            // CarPlay session just because that optional control channel did not
-                            // arrive; that teardown causes the visible reconnect loop.
-                            debugLog(
-                                "wireless handoff tunnel iAP2 unavailable after first video frame; " +
-                                    "preserving the active CarPlay session",
-                            )
-                            onStatus(CarPlayStatus.WirelessActive)
-                            return@Thread
-                        }
-                        closeWirelessStack(generation = generation)
-                        if (generation == wirelessGeneration.get()) {
-                            fail(IOException("Wireless CarPlay handoff timed out waiting for tunnel iAP2"), generation)
-                        }
-                    },
+                    { handleWirelessHandoffTimeout(generation) },
                     "xcertplay-wireless-handoff-timeout",
                 ).apply {
                     isDaemon = true
@@ -1652,6 +1651,25 @@ class CarPlayController(
             },
             WIRELESS_HANDOFF_TIMEOUT_MILLIS,
         )
+    }
+
+    private fun handleWirelessHandoffTimeout(generation: Int) = synchronized(wirelessResourceLock) {
+        if (closed || phase != Phase.WIRELESS || generation != wirelessGeneration.get() || wirelessFailureReported.get() ||
+            !wirelessHandoffRequested.get() || wirelessActiveReported.get() || wirelessTunnelReady.get()) {
+            return@synchronized
+        }
+        // Session establishment alone also occurs on black-screen failures. Only a rendered
+        // frame proves that projection is usable when the optional tunneled control is absent.
+        if (activeSession != null && wirelessConnectionProof.hasRenderedFrame(generation)) {
+            if (!wirelessActiveReported.compareAndSet(false, true)) return@synchronized
+            debugLog("wireless handoff fallback after rendered video; tunnel iAP2 unavailable; " +
+                "preserving AirPlay and closing Bluetooth bootstrap")
+            closeBluetoothBootstrapTransport()
+            onStatus(CarPlayStatus.WirelessActiveFallback, generation)
+        } else {
+            closeWirelessStack(generation = generation)
+            fail(IOException("Wireless CarPlay handoff timed out waiting for tunnel iAP2"), generation)
+        }
     }
 
     private fun closeBluetoothBootstrapTransport() {
@@ -1801,7 +1819,7 @@ class CarPlayController(
         val check = object : Runnable {
             override fun run() {
                 if (closed || generation != permissionPollGeneration) return
-                if (usbManager.hasPermission(device)) {
+                if (requireUsbManager().hasPermission(device)) {
                     onIphonePermission(IphoneUsbHost.PermissionResult.Granted(device))
                     return
                 }
@@ -1964,7 +1982,7 @@ class CarPlayController(
                 " status=${function.statusIn?.address?.let { "0x${it.toString(16)}" } ?: "none"}" +
                 " in=0x${function.bulkIn.address.toString(16)} out=0x${function.bulkOut.address.toString(16)}",
         )
-        val connection = usbManager.openDevice(device)
+        val connection = requireUsbManager().openDevice(device)
             ?: throw IphoneUsbException.DeviceUnavailable("Could not open the iPhone NCM connection")
         return NcmUsbBridge.open(connection, function)
     }
@@ -2174,13 +2192,7 @@ class CarPlayController(
 
     private fun startWirelessHotspot(generation: Int): WirelessHotspotInfo {
         val readyDeadline = System.nanoTime() + WirelessStartupPolicy.HOTSPOT_READY_MILLIS * 1_000_000
-        val hotspotMode = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-            config.wirelessHotspotMode == WirelessHotspotMode.WIFI_P2P
-        ) {
-            WirelessHotspotMode.LOCAL_ONLY_HOTSPOT
-        } else {
-            config.wirelessHotspotMode
-        }
+        val hotspotMode = config.wirelessHotspotMode
         if (com.shilapi.xcertplay.network.CarHotspotSettings.shouldEnable(
                 appContext, config.transport == CarPlayTransport.WIRELESS, hotspotMode,
             )
@@ -2609,6 +2621,16 @@ class CarPlayController(
         }
     }
 
+    private fun requireUsbManager(): UsbManager =
+        usbManager ?: throw IOException("USB service is unavailable on this device")
+
+    private fun hasRequiredUsbService(): Boolean {
+        if (usbManager != null ||
+            config.transport != CarPlayTransport.WIRED && config.mfiTarget != MfiTarget.USB_CH341) return true
+        fail(IOException("USB service is unavailable on this device"))
+        return false
+    }
+
     private fun fail(error: Throwable, generation: Int? = null) {
         synchronized(wirelessResourceLock) {
             if (closed || generation != null && generation != wirelessGeneration.get()) return
@@ -2706,6 +2728,8 @@ class CarPlayController(
             "STEP iap2/wireless: Bluetooth control loop running"
         CarPlayStatus.WirelessActive ->
             "STEP handoff/complete: tunnel iAP2 ready; Bluetooth bootstrap released"
+        CarPlayStatus.WirelessActiveFallback ->
+            "STEP handoff/fallback: rendered video preserved; tunnel iAP2 unavailable; Bluetooth bootstrap released"
         CarPlayStatus.DiscoveringIphone ->
             "STEP usb/discover: searching for an iPhone USB device"
         CarPlayStatus.WaitingForIphone ->

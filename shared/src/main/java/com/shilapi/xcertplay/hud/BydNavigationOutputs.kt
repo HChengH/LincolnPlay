@@ -24,11 +24,12 @@ object BydNavigationOutputs {
     private val overlayRoute = BydHudRouteState(
         staleRouteNs = 120_000_000_000L,
         emptyListHideNs = 8_000_000_000L,
+        keepAcrossNoRoute = true,
     )
+    private val amap = NavigationOutputWorker("diplay-amap-output", AmapAutoNavigationBridge::clear)
     private val standalone = NavigationOutputWorker("diplay-standalone-output", BydStandaloneNavigationBridge::clear)
     private val hud = NavigationOutputWorker("diplay-hud-output", BydHudBridge::clear)
     private val cluster = NavigationOutputWorker("diplay-cluster-output", BydClusterBridge::clear)
-    private val amap = NavigationOutputWorker("diplay-amap-output", AmapAutoNavigationBridge::clear)
 
     /** The host reports whether its CarPlay map window is on the cluster (see [BydClusterMapPause]). */
     fun setClusterMapShown(shown: Boolean) {
@@ -72,24 +73,6 @@ object BydNavigationOutputs {
         BydClusterSong.attach(app)
     }
 
-    internal fun onFrame(frame: Iap2Frame) {
-        if (frame.messageId == ClusterSongState.NOW_PLAYING_UPDATE) {
-            BydClusterSong.onFrame(frame)
-            return
-        }
-        if (frame.messageId != BydHudRouteState.ROUTE_GUIDANCE_UPDATE &&
-            frame.messageId != BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE) return
-        dumpRouteFrame(frame)
-        val owned = frame // Iap2Frame is immutable and defensively copies its payload.
-        updateOverlay(owned)
-        if (useStandalone) standalone.submit { BydStandaloneNavigationBridge.onFrame(owned) }
-        else {
-            hud.submit { BydHudBridge.onFrame(owned) }
-            cluster.submit { BydClusterBridge.onFrame(owned) }
-        }
-        amap.submit { AmapAutoNavigationBridge.onFrame(owned) }
-    }
-
     /**
      * Bounded raw dumps for car-side protocol calibration: maneuver updates (0x5202) always,
      * route updates (0x5201) at most every 5 s. The TLV layout was reverse-engineered on older
@@ -109,6 +92,24 @@ object BydNavigationOutputs {
     }
 
     private var lastRouteUpdateDumpAt = 0L
+
+    internal fun onFrame(frame: Iap2Frame) {
+        if (frame.messageId == ClusterSongState.NOW_PLAYING_UPDATE) {
+            BydClusterSong.onFrame(frame)
+            return
+        }
+        if (frame.messageId != BydHudRouteState.ROUTE_GUIDANCE_UPDATE &&
+            frame.messageId != BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE) return
+        val owned = frame // Iap2Frame is immutable and defensively copies its payload.
+        updateOverlay(owned)
+        dumpRouteFrame(frame)
+        if (useStandalone) standalone.submit { BydStandaloneNavigationBridge.onFrame(owned) }
+        else {
+            hud.submit { BydHudBridge.onFrame(owned) }
+            cluster.submit { BydClusterBridge.onFrame(owned) }
+        }
+        amap.submit { AmapAutoNavigationBridge.onFrame(owned) }
+    }
 
     /** Live next-turn state for the dashboard overlay. Called from the iAP2 thread. */
     fun setTurnOverlayListener(listener: ((ClusterTurnGuidance?) -> Unit)?) {
@@ -154,9 +155,13 @@ object BydNavigationOutputs {
     fun dashboardNote(text: String, source: Int? = null) = BydClusterSong.note(text, source)
 
     /** Best effort while alive; Android does not guarantee callbacks before force-stop. */
-    fun endNow() {
+    fun endNow(preserveTurnOverlay: Boolean = false) {
         standalone.clear(); hud.clear(); cluster.clear(); amap.clear(); BydClusterSong.end()
-        synchronized(overlayLock) { overlayRoute.clear() }
-        refreshTurnOverlay()
+        // Only a wireless session replacement retains the card. Explicit controller close
+        // and wired disconnect still clear it immediately.
+        if (!preserveTurnOverlay) {
+            synchronized(overlayLock) { overlayRoute.clear() }
+            refreshTurnOverlay()
+        }
     }
 }
