@@ -78,6 +78,10 @@ internal object AmapAutoNavigationBridge {
         }
         if (!force && frame == lastSent) return
         if (broadcastLocked(appContext, guidanceIntent(frame))) {
+            // Every distinct frame lands in the exportable log next to the sniffer's ground
+            // truth, so a wrong arrow on the cluster is attributable: did we send the wrong
+            // NEW_ICON, or does this decoder's icon table differ from BYD's?
+            com.shilapi.xcertplay.DiagnosticSnifferHook.post("Amap out: $frame")
             lastSent = frame
             ticksSinceSend = 0
             if (!guidanceLogged) {
@@ -92,6 +96,7 @@ internal object AmapAutoNavigationBridge {
         if (!broadcastLocked(appContext, endIntent())) return
         lastSent = null
         guidanceLogged = false
+        com.shilapi.xcertplay.DiagnosticSnifferHook.post("Amap out: guidance ended")
         Log.i(TAG, "guidance ended")
     }
 
