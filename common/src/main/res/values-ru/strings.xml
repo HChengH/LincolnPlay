@@ -606,4 +606,8 @@
     <string name="crash_report_restart">Перезапустить DiPlay</string>
     <string name="crash_report_close_hint">Отчёт закроется после перезапуска или ухода с этого экрана.</string>
     <string name="crash_report_copied">Скопировано</string>
+    <string name="guidance_duck_depth">Приглушать музыку при подсказках навигации</string>
+    <string name="duck_depth_light">Слабо (25% громкости)</string>
+    <string name="duck_depth_default">По умолчанию (12% громкости)</string>
+    <string name="duck_depth_deep">Сильно (6% громкости)</string>
 </resources>

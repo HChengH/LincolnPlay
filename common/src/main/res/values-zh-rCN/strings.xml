@@ -649,4 +649,8 @@
     <string name="crash_report_restart">重启 DiPlay</string>
     <string name="crash_report_close_hint">重启或离开此页面后报告关闭。</string>
     <string name="crash_report_copied">已复制</string>
+    <string name="guidance_duck_depth">导航播报时压低音乐</string>
+    <string name="duck_depth_light">轻度（保留25%音量）</string>
+    <string name="duck_depth_default">默认（保留12%音量）</string>
+    <string name="duck_depth_deep">深度（保留6%音量）</string>
 </resources>

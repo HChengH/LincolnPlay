@@ -606,4 +606,8 @@
     <string name="crash_report_restart">إعادة تشغيل DiPlay</string>
     <string name="crash_report_close_hint">يغلق التقرير عند إعادة التشغيل أو مغادرة هذه الشاشة.</string>
     <string name="crash_report_copied">تم النسخ</string>
+    <string name="guidance_duck_depth">خفض الموسيقى أثناء إرشادات التنقل</string>
+    <string name="duck_depth_light">خفيف (25% من مستوى الصوت)</string>
+    <string name="duck_depth_default">افتراضي (12% من مستوى الصوت)</string>
+    <string name="duck_depth_deep">عميق (6% من مستوى الصوت)</string>
 </resources>

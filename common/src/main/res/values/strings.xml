@@ -649,4 +649,8 @@
     <string name="crash_report_restart">Restart DiPlay</string>
     <string name="crash_report_close_hint">The report closes when you restart or leave this screen.</string>
     <string name="crash_report_copied">Copied</string>
+    <string name="guidance_duck_depth">Lower music during navigation prompts</string>
+    <string name="duck_depth_light">Light (25% volume)</string>
+    <string name="duck_depth_default">Default (12% volume)</string>
+    <string name="duck_depth_deep">Deep (6% volume)</string>
 </resources>

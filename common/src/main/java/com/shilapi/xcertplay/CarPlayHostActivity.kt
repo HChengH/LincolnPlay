@@ -3656,6 +3656,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 }
             },
             onMediaAudioChanged = CarPlayMediaKeys::onMediaAudioChanged,
+            guidanceDuckGain = { AirPlayPersistence.loadGuidanceDuckPercent(this) / 100f },
         )
     }
 

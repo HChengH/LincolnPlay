@@ -187,6 +187,8 @@ class AndroidMediaSink(
     private val onAudioDiagnostic: (String) -> Unit = {},
     /** True while any music ("media") audio stream is running; called from media threads. */
     private val onMediaAudioChanged: (Boolean) -> Unit = {},
+    /** Guidance ducking depth for media PCM, as a fraction of full volume. */
+    private val guidanceDuckGain: () -> Float = { 0.12f },
 ) : MediaSink {
     private val appContext = context?.applicationContext
     private val audioManager = appContext?.getSystemService(AudioManager::class.java)
@@ -356,8 +358,7 @@ class AndroidMediaSink(
      * success but never attenuates). Scales the media renderer's samples directly.
      */
     private fun applyOverlayGain(active: Boolean) {
-        // Duck depth tuned on the car: 0.25 was not low enough for the user.
-        val target = if (active) 0.12f else 1f
+        val target = if (active) guidanceDuckGain().coerceIn(0.02f, 1f) else 1f
         var ducked = 0
         for (renderer in audioRenderers.values) {
             if (renderer.channel() == AudioChannel.MEDIA) {

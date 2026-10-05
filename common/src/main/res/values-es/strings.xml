@@ -606,4 +606,8 @@
     <string name="crash_report_restart">Reiniciar DiPlay</string>
     <string name="crash_report_close_hint">El informe se cierra al reiniciar o salir de esta pantalla.</string>
     <string name="crash_report_copied">Copiado</string>
+    <string name="guidance_duck_depth">Bajar la música durante las indicaciones</string>
+    <string name="duck_depth_light">Suave (25% de volumen)</string>
+    <string name="duck_depth_default">Predeterminado (12% de volumen)</string>
+    <string name="duck_depth_deep">Profundo (6% de volumen)</string>
 </resources>

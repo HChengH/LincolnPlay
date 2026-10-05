@@ -571,6 +571,14 @@ class DiPlayActivity : ComponentActivity() {
             }
             mediaChannelControl(card)
             navigationChannelControl(card)
+            val duckPresets = listOf(25, 12, 6)
+            choice(card, getString(R.string.guidance_duck_depth), listOf(
+                getString(R.string.duck_depth_light),
+                getString(R.string.duck_depth_default),
+                getString(R.string.duck_depth_deep),
+            ), duckPresets.indexOf(AirPlayPersistence.loadGuidanceDuckPercent(this)).coerceAtLeast(0), reconnects = false) {
+                AirPlayPersistence.saveGuidanceDuckPercent(this, duckPresets[it])
+            }
         }
         section(content, getString(R.string.amap_navigation), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.amap_navigation_output),
