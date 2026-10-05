@@ -263,11 +263,26 @@ class NcmUsbBridge internal constructor(
     }
 
     private fun failSession(message: String, cause: Throwable? = null): IphoneUsbException.DeviceUnavailable {
-        val error = IphoneUsbException.DeviceUnavailable(message, cause)
+        // Embed the root cause: status logging keeps only .message (see IphoneUsbHost).
+        val detailed = if (cause == null) message else "$message: ${describeThrowable(cause)}"
+        val error = IphoneUsbException.DeviceUnavailable(detailed, cause)
         synchronized(stateLock) {
             if (failure == null) failure = error
         }
         return error
+    }
+
+    private fun describeThrowable(cause: Throwable): String = buildString {
+        append(cause.javaClass.simpleName)
+        if (!cause.message.isNullOrBlank()) append(": ").append(cause.message)
+        val frames = cause.stackTrace.take(3)
+        if (frames.isNotEmpty()) {
+            append(" @ ")
+            append(frames.joinToString(" <- ") { frame ->
+                "${frame.className.substringAfterLast('.')}.${frame.methodName}:${frame.lineNumber}"
+            })
+        }
+        cause.cause?.let { nested -> append(" | cause: ").append(describeThrowable(nested)) }
     }
 
     private fun checkOpen() {
