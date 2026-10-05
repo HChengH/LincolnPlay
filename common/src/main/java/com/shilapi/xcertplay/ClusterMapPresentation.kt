@@ -171,9 +171,16 @@ internal class ClusterMapPresentation(
             if (name == null) {
                 // Never replace a missing 5.1 side layer with a full-screen display.
                 if (DiLink51ClusterLayout.supported()) return null
-                return displays.firstOrNull { display ->
+                displays.firstOrNull { display ->
                     val size = sizeOf(display)
                     DiLink4ClusterDisplay.matches(display.name, size.x, size.y)
+                }?.let { return it }
+                // This fork's head unit (freescale MEK-MX8Q) exposes the cluster as a generic
+                // wide-aspect presentation display ("PresentationScreenLauncher" 1776x720) that
+                // AmapAuto renders onto; accept it when no DiLink-named display exists.
+                return displays.firstOrNull { display ->
+                    val size = sizeOf(display)
+                    display.name.contains("Presentation") && size.x in 1000..2600 && size.y in 400..900
                 }
             }
             return displays.firstOrNull { it.name == name }?.takeIf {

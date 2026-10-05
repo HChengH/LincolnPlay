@@ -70,7 +70,7 @@ internal class AudioFocusCoordinator(
         // Register every participating track even with focus disabled: same-app overlay
         // ducking (navigation prompts, Siri) still needs per-track volume control on boards
         // whose audio policy does not duck media for guidance.
-        if (manager == null || channel == AudioChannel.NAVIGATION) return
+        if (manager == null) return
         active[track] = Entry(channel, attributes)
         // A track joining while an overlay plays must inherit the ducked volume immediately.
         applyVolumes("register-${channel.name.lowercase()}")
@@ -135,7 +135,9 @@ internal class AudioFocusCoordinator(
             AudioChannel.MEDIA -> AudioManager.AUDIOFOCUS_GAIN
             AudioChannel.PHONE -> AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
             AudioChannel.ASSISTANT -> AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
-            AudioChannel.NAVIGATION -> return
+            // The dongle-app recipe: guidance requests MAY_DUCK with its usage so the audio
+            // policy ducks the media bus while a prompt plays.
+            AudioChannel.NAVIGATION -> AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
         }
         val next = AudioFocusRequest.Builder(gain)
             .setAudioAttributes(primary.attributes)
@@ -151,9 +153,9 @@ internal class AudioFocusCoordinator(
 
     private fun AudioChannel.focusPriority(): Int = when (this) {
         AudioChannel.MEDIA -> 3
-        AudioChannel.PHONE -> 2
-        AudioChannel.ASSISTANT -> 1
-        AudioChannel.NAVIGATION -> 0
+        AudioChannel.PHONE -> 4
+        AudioChannel.ASSISTANT -> 5
+        AudioChannel.NAVIGATION -> 6
     }
 
     private companion object {
@@ -1201,10 +1203,6 @@ private class AudioRenderer(
     private fun requestAudioFocus() {
         val channel = mappedChannel ?: return
         val attributes = trackAttributes ?: return
-        if (channel == AudioChannel.NAVIGATION) {
-            Log.i(TAG, "audio focus skipped channel=NAVIGATION; overlays without ducking")
-            return
-        }
         track?.let { audioFocusCoordinator.acquire(it, channel, attributes) }
     }
 
