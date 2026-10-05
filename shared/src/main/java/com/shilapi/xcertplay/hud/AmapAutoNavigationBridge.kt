@@ -16,7 +16,10 @@ import java.util.concurrent.TimeUnit
  */
 internal object AmapAutoNavigationBridge {
     private const val TAG = "DiPlay-AmapAuto"
-    const val ACTION = "AUTONAVI_STANDARD_SEND_RECV"
+    // This board's decoder listens for the BYD variant action (captured from its own AmapAuto
+    // on the car: KEY_TYPE 13022 pings and 10019/EXTRA_STATE=40 idle keepalives), not the
+    // public AUTONAVI_STANDARD_SEND_RECV spelling.
+    const val ACTION = "AUTONAVI_STANDARD_BROADCAST_SEND"
     private const val KEY_GUIDANCE = 10001
     private const val KEY_STATE = 10019
     private const val STATE_ENDED = 9

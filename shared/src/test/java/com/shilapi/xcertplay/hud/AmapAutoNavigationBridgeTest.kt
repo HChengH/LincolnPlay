@@ -17,6 +17,7 @@ class AmapAutoNavigationBridgeTest {
         val intent = AmapAutoNavigationBridge.guidanceIntent(frame)
         assertEquals(AmapAutoNavigationBridge.ACTION, intent.action)
         assertNull(intent.`package`)
+        assertEquals("AUTONAVI_STANDARD_BROADCAST_SEND", intent.action)
         assertEquals(10001, intent.getIntExtra("KEY_TYPE", -1))
         assertEquals(2, intent.getIntExtra("NEW_ICON", -1)) // Apple type 1 -> Amap LEFT
         assertEquals(250, intent.getIntExtra("SEG_REMAIN_DIS", -1))
