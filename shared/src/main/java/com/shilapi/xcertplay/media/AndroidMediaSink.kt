@@ -1240,7 +1240,9 @@ private class AudioRenderer(
 
     private fun usageFor(channel: AudioChannel): Int = when (channel) {
         AudioChannel.MEDIA -> AudioAttributes.USAGE_MEDIA
-        AudioChannel.PHONE -> AudioAttributes.USAGE_VOICE_COMMUNICATION
+        // The board-tuned dongle config ran calls on NOTIFICATION_RINGTONE rather than
+        // VOICE_COMMUNICATION (tengshi preset "02"); match the empirically working choice.
+        AudioChannel.PHONE -> AudioAttributes.USAGE_NOTIFICATION_RINGTONE
         AudioChannel.ASSISTANT -> AudioAttributes.USAGE_ASSISTANT
         AudioChannel.NAVIGATION -> AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
     }
