@@ -5,6 +5,7 @@ import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbRequest
+import android.os.Build
 import android.util.Log
 import java.io.Closeable
 import java.nio.ByteBuffer
@@ -45,7 +46,10 @@ class NcmUsbBridge internal constructor(
     // section for the whole wait, which blocks ART's GC thread flip and, with it, every other USB
     // transfer (seen as ~0.8 s stalls of video and audio). A timed-out request stays queued, so no
     // data is lost between calls. This is the only requestWait() user on this connection.
-    private val directReadBuffer = ByteBuffer.allocateDirect(READ_CHUNK_BYTES)
+    // Android 8.x caps UsbRequest.queue(ByteBuffer) at 16384 bytes, so the chunk shrinks there.
+    private val directReadBuffer = ByteBuffer.allocateDirect(
+        if (Build.VERSION.SDK_INT >= 28) READ_CHUNK_BYTES else 16_384,
+    )
     private var readRequest: UsbRequest? = null
     private var readQueued = false
     private val statusRunning = AtomicBoolean(statusEndpoint != null)

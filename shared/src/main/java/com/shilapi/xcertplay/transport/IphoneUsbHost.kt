@@ -367,7 +367,7 @@ class Iap2UsbSession internal constructor(
                 checkOpenLocked()
                 pendingRead = request
             }
-            val buffer = ByteBuffer.allocateDirect(USBMUX_READ_CHUNK_BYTES)
+            val buffer = ByteBuffer.allocateDirect(readChunkBytes())
             if (!request.queue(buffer)) {
                 throw IphoneUsbException.DeviceUnavailable(
                     "Android could not queue USBMUX read request (${requestDiagnostics(timeoutMillis, buffer.capacity())})",
@@ -458,6 +458,14 @@ class Iap2UsbSession internal constructor(
         }
         cause.cause?.let { nested -> append(" | cause: ").append(describeThrowable(nested)) }
     }
+
+    /**
+     * Android 8.x throws IllegalArgumentException in UsbRequest.queue(ByteBuffer) above 16384
+     * bytes; Android 9+ accepts the full chunk. Bulk-IN reads may return short, so a smaller
+     * chunk is transparent to the framing above.
+     */
+    private fun readChunkBytes(): Int =
+        if (Build.VERSION.SDK_INT >= 28) USBMUX_READ_CHUNK_BYTES else 16_384
 
     private fun requestDiagnostics(timeoutMillis: Long, bufferBytes: Int? = null): String = buildString {
         append("api=").append(Build.VERSION.SDK_INT)
