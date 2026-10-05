@@ -67,10 +67,9 @@ internal class AudioFocusCoordinator(
 
     @Synchronized
     fun acquire(track: AudioTrack, channel: AudioChannel, attributes: AudioAttributes) {
-        // Register every participating track even with focus disabled: same-app overlay
-        // ducking (navigation prompts, Siri) still needs per-track volume control on boards
-        // whose audio policy does not duck media for guidance.
-        if (manager == null) return
+        // Guidance must not register: it is the ducking TRIGGER, and this ROM's focus policy
+        // muted the whole app when guidance requested focus (no audio at all on the car).
+        if (manager == null || channel == AudioChannel.NAVIGATION) return
         active[track] = Entry(channel, attributes)
         // A track joining while an overlay plays must inherit the ducked volume immediately.
         applyVolumes("register-${channel.name.lowercase()}")
