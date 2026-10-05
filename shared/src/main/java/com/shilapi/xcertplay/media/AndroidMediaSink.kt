@@ -1422,7 +1422,7 @@ private class AudioRenderer(
             applyFadeIn(data, offset, length)
             fadeApplied = true
         }
-        if (gain < 1f) applyGain(data, offset, length)
+        if (gain < 1f || effectiveGain < 1f) applyGain(data, offset, length)
         var written = 0
         while (written < length && running) {
             val writeLength = if (playbackStarted) {
@@ -1548,6 +1548,7 @@ private class AudioRenderer(
      * ignores it, so guidance ducking is enforced by scaling the PCM samples themselves.
      */
     @Volatile private var gain = 1f
+    private var effectiveGain = 1f // writer-thread owned; ramps toward [gain]
 
     fun setGain(value: Float) {
         gain = value.coerceIn(0f, 1f)
@@ -1557,14 +1558,23 @@ private class AudioRenderer(
 
     private fun applyGain(data: ByteArray, offset: Int, length: Int) {
         val end = offset + (length - length % 2)
+        val samples = (end - offset) / 2
+        if (samples <= 0) return
+        // Ramp across the chunk so duck/restore transitions are not audible hard steps.
+        val startGain = effectiveGain
+        val targetGain = gain
         var position = offset
+        var index = 0
         while (position < end) {
+            val g = startGain + (targetGain - startGain) * index / samples
             val sample = (data[position].toInt() and 0xff) or (data[position + 1].toInt() shl 8)
-            val scaled = (sample * gain).toInt().coerceIn(-32768, 32767)
+            val scaled = (sample * g).toInt().coerceIn(-32768, 32767)
             data[position] = scaled.toByte()
             data[position + 1] = (scaled shr 8).toByte()
             position += 2
+            index++
         }
+        effectiveGain = targetGain
     }
 
     private fun applyFadeIn(data: ByteArray, offset: Int, length: Int) {
