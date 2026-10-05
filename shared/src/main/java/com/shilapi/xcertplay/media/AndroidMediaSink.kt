@@ -53,11 +53,11 @@ internal class AudioFocusCoordinator(
             when (change) {
                 AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                     externalDuck = true
-                    applyVolumes()
+                    applyVolumes("focus-$change")
                 }
                 AudioManager.AUDIOFOCUS_GAIN -> {
                     externalDuck = false
-                    applyVolumes()
+                    applyVolumes("focus-$change")
                 }
                 // Keep CarPlay audio running on permanent or transient loss. Some head units
                 // do not send a later gain callback after taking focus back.
@@ -72,6 +72,8 @@ internal class AudioFocusCoordinator(
         // whose audio policy does not duck media for guidance.
         if (manager == null || channel == AudioChannel.NAVIGATION) return
         active[track] = Entry(channel, attributes)
+        // A track joining while an overlay plays must inherit the ducked volume immediately.
+        applyVolumes("register-${channel.name.lowercase()}")
         if (enabled) refreshRequest()
     }
 
@@ -91,16 +93,29 @@ internal class AudioFocusCoordinator(
         val before = overlayCount
         overlayCount = (overlayCount + if (playing) 1 else -1).coerceAtLeast(0)
         if ((before == 0) != (overlayCount == 0)) {
-            runCatching {
-                report("Audio: overlay ${if (overlayCount > 0) "ducking" else "restoring"} media")
-            }
-            applyVolumes()
+            applyVolumes("overlay-${if (overlayCount > 0) "start" else "end"}")
         }
     }
 
-    private fun applyVolumes() {
+    private fun applyVolumes(reason: String) {
         val volume = if (externalDuck || overlayCount > 0) DUCKED_VOLUME else FULL_VOLUME
-        active.keys.forEach { track -> runCatching { track.setStereoVolume(volume, volume) } }
+        var tracks = 0
+        var lastError: Int? = null
+        active.keys.forEach { track ->
+            runCatching {
+                if (track.setStereoVolume(volume, volume) != AudioTrack.SUCCESS) {
+                    lastError = track.setStereoVolume(volume, volume)
+                }
+                tracks += 1
+            }
+        }
+        // tracks=0 or a setStereoVolume error explains a missing duck in the field.
+        runCatching {
+            report(
+                "Audio: volume $reason -> ${if (volume < FULL_VOLUME) "ducked" else "full"} " +
+                    "tracks=$tracks setVolumeError=${lastError ?: "none"}",
+            )
+        }
     }
 
     private var externalDuck = false
