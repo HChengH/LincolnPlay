@@ -1040,12 +1040,29 @@ private class AudioRenderer(
         if (streamOverride == 0) {
             attributes = audioAttributesFor(selection)
             routeLabel = "usage"
-            built = AudioTrack.Builder()
-                .setAudioAttributes(attributes)
-                .setAudioFormat(pcmFormat(encoding, channelMask))
-                .setTransferMode(AudioTrack.MODE_STREAM)
-                .setBufferSizeInBytes(plan.trackBufferBytes)
-                .build()
+            built = try {
+                AudioTrack.Builder()
+                    .setAudioAttributes(attributes)
+                    .setAudioFormat(pcmFormat(encoding, channelMask))
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .setBufferSizeInBytes(plan.trackBufferBytes)
+                    .build()
+            } catch (error: RuntimeException) {
+                // Some 8.x vendor audio policies reject usage-based tracks for guidance
+                // (crashed on the NXP head unit); the pre-change legacy stream played fine,
+                // and same-app overlay ducking does not depend on the routing.
+                diagnosticStage = "track-usage-fallback"
+                routeLabel = "usage(rejected=${error.javaClass.simpleName};legacy=${selection.streamType})"
+                Log.w(TAG, "usage-based track rejected; falling back to legacy stream", error)
+                AudioTrack(
+                    selection.streamType,
+                    format.sampleRate,
+                    channelMask,
+                    encoding,
+                    plan.trackBufferBytes,
+                    AudioTrack.MODE_STREAM,
+                )
+            }
         } else {
             val streamType = streamOverride
             routeLabel = "streamType=$streamType"

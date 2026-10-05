@@ -4569,9 +4569,13 @@ class CarPlayHostActivity : ComponentActivity() {
         val now = System.currentTimeMillis()
         sessionLog?.append(formattedLogLine(safe, now))
         if (AirPlayPersistence.loadSessionLogOverlay(this)) {
-            logLines.addLast(LogEntry(now, safe))
-            while (logLines.size > OVERLAY_LOG_LINES) logLines.removeFirst()
-            refreshLogView(now)
+            // Audio and control threads log concurrently; an unsynchronized ArrayDeque here
+            // threw ConcurrentModificationException while rendering the overlay on the car.
+            synchronized(logLines) {
+                logLines.addLast(LogEntry(now, safe))
+                while (logLines.size > OVERLAY_LOG_LINES) logLines.removeFirst()
+            }
+            mainHandler.post { refreshLogView(System.currentTimeMillis()) }
         }
     }
 
@@ -4595,18 +4599,22 @@ class CarPlayHostActivity : ComponentActivity() {
         sessionLog = activeLog
     }
 
+    /** Main thread only (appendLog posts here; the expiry runnable runs on the main handler). */
     private fun refreshLogView(nowMillis: Long) {
         val cutoff = nowMillis - LOG_RETENTION_MILLIS
-        while (logLines.firstOrNull()?.timestampMillis?.let { it <= cutoff } == true) {
-            logLines.removeFirst()
+        val text = synchronized(logLines) {
+            while (logLines.firstOrNull()?.timestampMillis?.let { it <= cutoff } == true) {
+                logLines.removeFirst()
+            }
+            logLines.joinToString("\n") { it.text }
         }
-        statusView?.text = logLines.joinToString("\n") { it.text }
+        statusView?.text = text
         scrollLogsToBottom()
 
         mainHandler.removeCallbacks(expireOldLogLines)
-        logLines.firstOrNull()?.let { oldest ->
-            val delay = (oldest.timestampMillis + LOG_RETENTION_MILLIS - nowMillis + 1L)
-                .coerceAtLeast(1L)
+        val oldestTimestamp = synchronized(logLines) { logLines.firstOrNull()?.timestampMillis }
+        oldestTimestamp?.let {
+            val delay = (it + LOG_RETENTION_MILLIS - nowMillis + 1L).coerceAtLeast(1L)
             mainHandler.postDelayed(expireOldLogLines, delay)
         }
     }
