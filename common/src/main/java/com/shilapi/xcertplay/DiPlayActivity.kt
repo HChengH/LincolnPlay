@@ -658,8 +658,8 @@ class DiPlayActivity : ComponentActivity() {
             ), duckPresets.indexOf(AirPlayPersistence.loadGuidanceDuckPercent(this)).coerceAtLeast(0), reconnects = false) {
                 AirPlayPersistence.saveGuidanceDuckPercent(this, duckPresets[it])
             }
-            toggle(card, getString(R.string.cluster_song),
-                getString(R.string.cluster_song_description),
+            toggle(card, getString(R.string.cluster_now_playing),
+                getString(R.string.cluster_now_playing_description),
                 AirPlayPersistence.loadClusterSongEnabled(this)) {
                 AirPlayPersistence.saveClusterSongEnabled(this, it)
             }
