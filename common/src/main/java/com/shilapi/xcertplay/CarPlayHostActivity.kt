@@ -1269,7 +1269,9 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun buildContentView(): View {
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         val video = TextureView(this).apply {
-            isOpaque = false
+            // Opaque lets the compositor skip per-frame alpha blending; letterboxing sizes
+            // this view to the video, so the surface is always fully covered.
+            isOpaque = true
             surfaceTextureListener = textureListener
         }
         pictureBinding = CarPlayPicture.Binding(video)
@@ -4477,7 +4479,10 @@ class CarPlayHostActivity : ComponentActivity() {
             return true
         }
         val contacts = CarPlayTouchMapper.contacts(event, content)
-        val queued = controller?.sendTouch(contacts) ?: false
+        val queued = controller?.sendTouch(
+            contacts,
+            transient = event.actionMasked == MotionEvent.ACTION_MOVE,
+        ) ?: false
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN,
             MotionEvent.ACTION_POINTER_DOWN,

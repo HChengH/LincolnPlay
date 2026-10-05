@@ -192,6 +192,8 @@ class CarPlayController(
     )
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val touchExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private val pendingTransientTouch = AtomicReference<List<AirPlayContact>>()
+    private val transientTouchDrainPending = AtomicBoolean(false)
     private val tunnelExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val hostId = UUID.randomUUID().toString().uppercase(Locale.US)
@@ -480,11 +482,24 @@ class CarPlayController(
         }
     }
 
-    fun sendTouch(contacts: List<AirPlayContact>): Boolean {
+    fun sendTouch(contacts: List<AirPlayContact>, transient: Boolean = false): Boolean {
         if (closed) return false
         val session = activeSession ?: return false
         return try {
-            touchExecutor.execute { session.sendTouch(contacts) }
+            if (transient) {
+                // Stale intermediate moves replay as rubber-banding when the event socket
+                // burps; a move only needs the latest finger position, so coalesce them.
+                pendingTransientTouch.set(contacts)
+                if (transientTouchDrainPending.compareAndSet(false, true)) {
+                    touchExecutor.execute {
+                        transientTouchDrainPending.set(false)
+                        val latest = pendingTransientTouch.getAndSet(null) ?: return@execute
+                        if (!closed && activeSession === session) session.sendTouch(latest)
+                    }
+                }
+            } else {
+                touchExecutor.execute { session.sendTouch(contacts) }
+            }
             true
         } catch (_: Exception) {
             false
