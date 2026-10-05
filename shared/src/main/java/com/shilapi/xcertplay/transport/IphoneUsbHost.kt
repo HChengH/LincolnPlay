@@ -363,15 +363,16 @@ class Iap2UsbSession internal constructor(
                 )
             }
             initialized = true
+            val buffer = ByteBuffer.allocateDirect(readChunkBytes())
+            // Publish and queue together so close() cannot cancel before the request is queued.
             synchronized(stateLock) {
                 checkOpenLocked()
                 pendingRead = request
-            }
-            val buffer = ByteBuffer.allocateDirect(readChunkBytes())
-            if (!request.queue(buffer)) {
-                throw IphoneUsbException.DeviceUnavailable(
-                    "Android could not queue USBMUX read request (${requestDiagnostics(timeoutMillis, buffer.capacity())})",
-                )
+                if (!request.queue(buffer)) {
+                    throw IphoneUsbException.DeviceUnavailable(
+                        "Android could not queue USBMUX read request (${requestDiagnostics(timeoutMillis, buffer.capacity())})",
+                    )
+                }
             }
             val completed = try {
                 connection.requestWait(timeoutMillis)

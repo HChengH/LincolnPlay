@@ -202,6 +202,18 @@ class CarPlayController(
     private val availabilityPollGeneration = AtomicInteger(0)
     private var permissionPollGeneration = 0
     private var reenumerationAttempts = 0
+    private val wiredGeneration = AtomicInteger(0)
+
+    /**
+     * True once this bring-up has driven the phone through the vendor re-enumeration request.
+     * A CarPlay USB configuration that is already present when a new session starts is a leftover
+     * from the previous one: its bulk endpoints stay bound to the closed connection, so the USBMUX
+     * handshake freezes until its 60 s timeout. Only a configuration this run caused can be trusted.
+     */
+    private var reenumerationPerformed = false
+
+    /** Device node handed to the vendor request; a different node means a real re-enumeration. */
+    private var reenumerationSourceDeviceName: String? = null
     private var lastReportedStatus: CarPlayStatus? = null
     private var mfiResetLogged = false
 
@@ -210,6 +222,14 @@ class CarPlayController(
     @Volatile private var ch341Host: Ch341UsbHost? = null
     @Volatile private var mfiSession: MfiSession? = null
     @Volatile private var mux: Iap2UsbMuxHost? = null
+
+    /**
+     * The open USBMUX pipe, tracked separately from [mux] because [Iap2UsbMuxHost.open] can block
+     * for the whole handshake: closed mid-handshake, `mux` is still null and only this field lets
+     * teardown release the connection. A connection left open keeps the phone's bulk endpoints
+     * bound to a dead host; the next bring-up then fails until the cable is re-plugged.
+     */
+    @Volatile private var wiredUsbSession: Iap2UsbSession? = null
     @Volatile private var csm: Iap2Session? = null
     @Volatile private var activeSession: AirPlaySession? = null
     @Volatile private var requestedDashboardUrl: String? = airPlayConfig.cluster?.initialUrl
@@ -562,6 +582,7 @@ class CarPlayController(
         closeReceivers()
         availabilityPollGeneration.incrementAndGet()
         wirelessGeneration.incrementAndGet()
+        wiredGeneration.incrementAndGet()
         permissionPollGeneration += 1
         touchExecutor.shutdownNow()
         tunnelExecutor.shutdownNow()
@@ -580,6 +601,10 @@ class CarPlayController(
                     }
                     closeBestEffort("USBMUX") { mux?.close() }
                     mux = null
+                    // Release the pipe directly as well: closed mid-handshake the host above was
+                    // never constructed, so mux is null and only this closes the USB connection.
+                    closeBestEffort("USBMUX pipe") { wiredUsbSession?.close() }
+                    wiredUsbSession = null
                     if (config.transport == CarPlayTransport.WIRED) {
                         closeBestEffort("VPN/NCM") { service?.detach() }
                     }
@@ -1629,9 +1654,12 @@ class CarPlayController(
 
     private fun startIphone() {
         diagnosticRun.incrementAndGet()
+        wiredGeneration.incrementAndGet()
         availabilityPollGeneration.incrementAndGet()
         phase = Phase.IPHONE
         reenumerationAttempts = 0
+        reenumerationPerformed = false
+        reenumerationSourceDeviceName = null
         onStatus(CarPlayStatus.DiscoveringIphone)
         checkIphoneAvailability()
     }
@@ -1653,7 +1681,10 @@ class CarPlayController(
     }
 
     private fun requestIphonePermission(device: UsbDevice) {
-        mainHandler.post { doRequestIphonePermission(device) }
+        val generation = wiredGeneration.get()
+        mainHandler.post {
+            if (!closed && generation == wiredGeneration.get()) doRequestIphonePermission(device)
+        }
     }
 
     private fun doRequestIphonePermission(device: UsbDevice) {
@@ -1691,18 +1722,30 @@ class CarPlayController(
                             "USB configuration ready=${configuration != null} " +
                                 "configurationId=${configuration?.id ?: "none"} " +
                                 "reenumerationAttempts=$reenumerationAttempts " +
+                                "reenumerationPerformed=$reenumerationPerformed " +
                                 "action=${when {
-                                    configuration != null -> "reuse-descriptors"
+                                    configuration != null && (!reenumerationPerformed ||
+                                        reenumerationAttempts >= MAXIMUM_REENUMERATION_ATTEMPTS) -> "reuse-descriptors"
+                                    configuration != null -> "request-transition-stale-configuration"
                                     reenumerationAttempts < MAXIMUM_REENUMERATION_ATTEMPTS -> "request-transition"
                                     else -> "reject-missing-configuration"
                                 }}",
                         )
-                        if (configuration != null) {
-                            openDataPaths(result.device)
-                        } else if (reenumerationAttempts < MAXIMUM_REENUMERATION_ATTEMPTS) {
-                            beginReenumeration(result.device)
-                        } else {
-                            fail(
+                        when {
+                            // A leftover configuration cannot be trusted (see reenumerationPerformed),
+                            // so drive the phone through the vendor request to get a clean device.
+                            configuration != null && !reenumerationPerformed &&
+                                reenumerationAttempts < MAXIMUM_REENUMERATION_ATTEMPTS -> {
+                                debugLog(
+                                    "wired USB already exposes a CarPlay configuration from an " +
+                                        "earlier session; re-enumerating for a clean state",
+                                )
+                                beginReenumeration(result.device)
+                            }
+                            configuration != null -> openDataPaths(result.device)
+                            reenumerationAttempts < MAXIMUM_REENUMERATION_ATTEMPTS ->
+                                beginReenumeration(result.device)
+                            else -> fail(
                                 IphoneUsbException.Protocol(
                                     "iPhone did not expose a complete CarPlay USB configuration",
                                 ),
@@ -1747,17 +1790,51 @@ class CarPlayController(
     }
 
     private fun beginReenumeration(device: UsbDevice) {
+        val generation = wiredGeneration.get()
         phase = Phase.REENUMERATION
         reenumerationAttempts += 1
+        reenumerationPerformed = true
+        // Remember which device node we asked the phone to leave. Only a *different* node proves
+        // the re-enumeration really happened; reusing the same node is the stale state that makes
+        // the USBMUX handshake time out.
+        reenumerationSourceDeviceName = device.deviceName
         connectionDiagnostic("USB transition requested count=$reenumerationAttempts")
         onStatus(CarPlayStatus.SelectingConfiguration)
         iphoneHost.requestCarPlayReenumerationAsync(device, executor) { transition ->
+            if (closed || generation != wiredGeneration.get()) {
+                return@requestCarPlayReenumerationAsync
+            }
             when (transition) {
-                IphoneUsbHost.TransitionResult.ReenumerationRequested ->
+                IphoneUsbHost.TransitionResult.ReenumerationRequested -> {
                     onStatus(CarPlayStatus.WaitingForReenumeration)
+                    // Do not depend on ACTION_USB_DEVICE_ATTACHED alone: old Android builds can
+                    // miss the broadcast when the phone comes back quickly, and the bring-up then
+                    // sits idle with the phone already re-attached.
+                    scheduleReenumerationPoll()
+                }
                 is IphoneUsbHost.TransitionResult.Failed -> fail(transition.error)
             }
         }
+    }
+
+    /** Backstop for a missed USB attach broadcast while waiting for a new device node. */
+    private fun scheduleReenumerationPoll() {
+        val generation = availabilityPollGeneration.get()
+        mainHandler.postDelayed(
+            {
+                if (closed || phase != Phase.REENUMERATION) return@postDelayed
+                if (generation != availabilityPollGeneration.get()) return@postDelayed
+                val replacement = iphoneHost.discover()
+                    .firstOrNull { it.deviceName != reenumerationSourceDeviceName }
+                if (replacement != null) {
+                    debugLog("wired re-enumerated iPhone appeared; requesting USB access")
+                    requestIphonePermission(replacement)
+                } else {
+                    scheduleReenumerationPoll()
+                }
+            },
+            REENUMERATION_POLL_INTERVAL_MILLIS,
+        )
     }
 
     private fun onIphoneAttached(device: UsbDevice) {
@@ -1787,6 +1864,7 @@ class CarPlayController(
     }
 
     private fun openDataPaths(device: UsbDevice) {
+        val generation = wiredGeneration.get()
         phase = Phase.DATAPATHS
         debugLog("wired opening iPhone USB data paths")
         onStatus(CarPlayStatus.SelectingConfiguration)
@@ -1794,15 +1872,27 @@ class CarPlayController(
         iphoneHost.openIap2UsbSessionAsync(device, executor) { result ->
             when (result) {
                 is IphoneUsbHost.Iap2SessionResult.Connected -> {
+                    // Publish the pipe before touching the phone: everything past this point can
+                    // block for the full USBMUX handshake timeout, and teardown must be able to
+                    // release it even when mux is still unset.
+                    if (closed || generation != wiredGeneration.get()) {
+                        result.session.close()
+                        return@openIap2UsbSessionAsync
+                    }
+                    wiredUsbSession = result.session
                     try {
                         val ncm = openNcm(device)
-                        runStack(result.session, ncm)
+                        runStack(result.session, ncm, generation)
                     } catch (error: Throwable) {
-                        result.session.close()
-                        fail(error)
+                        if (!closed && generation == wiredGeneration.get()) fail(error)
+                    } finally {
+                        // Always release the pipe, including when the handshake never returned.
+                        closeBestEffort("USBMUX pipe") { result.session.close() }
+                        if (wiredUsbSession === result.session) wiredUsbSession = null
                     }
                 }
-                is IphoneUsbHost.Iap2SessionResult.Failed -> fail(result.error)
+                is IphoneUsbHost.Iap2SessionResult.Failed ->
+                    if (!closed && generation == wiredGeneration.get()) fail(result.error)
             }
         }
     }
@@ -1825,12 +1915,20 @@ class CarPlayController(
         return NcmUsbBridge.open(connection, function)
     }
 
-    private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge) {
+    private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge, generation: Int) {
+        fun cancelled() = closed || generation != wiredGeneration.get()
         phase = Phase.CONTROL
         var ncmOwnedLocally = true
         try {
-            if (closed) return
+            if (cancelled()) return
+            // The USBMUX handshake can block for its whole timeout; without this marker a
+            // stale-endpoint failure is indistinguishable from a frozen app in the report.
+            debugLog("wired opening the USBMUX host")
             val mux = Iap2UsbMuxHost.open(usbSession, onDiagnostic = ::connectionDiagnostic)
+            if (cancelled()) {
+                mux.close()
+                return
+            }
             this.mux = mux
             debugLog("wired USBMUX host opened")
             onStatus(CarPlayStatus.Pairing)
@@ -2585,6 +2683,7 @@ class CarPlayController(
         private const val WIRELESS_HANDOFF_TIMEOUT_MILLIS = 45_000L
         private const val RFCOMM_CONNECT_TIMEOUT_MILLIS = 15_000L
         private const val MAXIMUM_REENUMERATION_ATTEMPTS = 2
+        private const val REENUMERATION_POLL_INTERVAL_MILLIS = 400L
         private const val EXECUTOR_CLOSE_TIMEOUT_MILLIS = 2_000L
         private const val ADAPTER_ADDRESS_PLACEHOLDER = "02:00:00:00:00:00"
         private val BLUETOOTH_ADDRESS = Regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")

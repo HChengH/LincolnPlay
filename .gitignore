@@ -41,3 +41,4 @@ release-signing.properties
 *.aab
 .zcode/
 /diplay-aviator-debug.apk
+.fork-review/
