@@ -1053,7 +1053,26 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     // Hardware navigation belongs to the iPhone-rendered CarPlay UI, not Android View focus.
+    private val keyLogTimes = mutableMapOf<Int, Long>()
+
+    /** One line per distinct key press (throttled) so car tests reveal wheel-button mappings. */
+    private fun logKeyEvent(event: KeyEvent) {
+        if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount != 0) return
+        val now = System.currentTimeMillis()
+        val allowed = synchronized(keyLogTimes) {
+            val last = keyLogTimes[event.keyCode] ?: 0L
+            if (now - last >= 1_000L) {
+                keyLogTimes[event.keyCode] = now
+                true
+            } else {
+                false
+            }
+        }
+        if (allowed) appendLog("Key ${KeyEvent.keyCodeToString(event.keyCode)}(${event.keyCode})")
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        logKeyEvent(event)
         if (!menuOpen && AndroidTvInputMode.shouldUseKnobAsPrimaryInput(this) &&
             CarPlayRemoteKeys.dispatch(event, controller)) {
             if (event.repeatCount == 0) {

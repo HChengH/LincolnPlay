@@ -313,18 +313,23 @@ internal object CarPlayMediaKeys {
  * media controllers (not hardware keys) call [onPlay] and [onPause] with an explicit intent.
  */
 internal class CarPlayMediaCallback(private val send: (index: Int, source: String) -> Unit) : MediaSession.Callback() {
+    private fun dispatch(index: Int, source: String) {
+        DiagnosticSnifferHook.post("Media session key: $source")
+        send(index, source)
+    }
+
     override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
         @Suppress("DEPRECATION")
         val event = mediaButtonIntent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT) ?: return false
         val index = CarPlayMediaButton.forKeyCode(event.keyCode) ?: return super.onMediaButtonEvent(mediaButtonIntent)
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-            send(index, KeyEvent.keyCodeToString(event.keyCode))
+            dispatch(index, KeyEvent.keyCodeToString(event.keyCode))
         }
         return true
     }
 
-    override fun onPlay() = send(CarPlayMediaButton.PLAY, "play")
-    override fun onPause() = send(CarPlayMediaButton.PAUSE, "pause")
-    override fun onSkipToNext() = send(CarPlayMediaButton.NEXT, "next")
-    override fun onSkipToPrevious() = send(CarPlayMediaButton.PREVIOUS, "previous")
+    override fun onPlay() = dispatch(CarPlayMediaButton.PLAY, "play")
+    override fun onPause() = dispatch(CarPlayMediaButton.PAUSE, "pause")
+    override fun onSkipToNext() = dispatch(CarPlayMediaButton.NEXT, "next")
+    override fun onSkipToPrevious() = dispatch(CarPlayMediaButton.PREVIOUS, "previous")
 }

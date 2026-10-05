@@ -51,8 +51,14 @@ internal class AudioFocusCoordinator(
         synchronized(this) {
             runCatching { report("Audio: focus change=$change activeTracks=${active.size}") }
             when (change) {
-                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> setVolume(DUCKED_VOLUME)
-                AudioManager.AUDIOFOCUS_GAIN -> setVolume(FULL_VOLUME)
+                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                    externalDuck = true
+                    applyVolumes()
+                }
+                AudioManager.AUDIOFOCUS_GAIN -> {
+                    externalDuck = false
+                    applyVolumes()
+                }
                 // Keep CarPlay audio running on permanent or transient loss. Some head units
                 // do not send a later gain callback after taking focus back.
             }
@@ -61,15 +67,44 @@ internal class AudioFocusCoordinator(
 
     @Synchronized
     fun acquire(track: AudioTrack, channel: AudioChannel, attributes: AudioAttributes) {
-        if (!enabled || manager == null || channel == AudioChannel.NAVIGATION) return
+        // Register every participating track even with focus disabled: same-app overlay
+        // ducking (navigation prompts, Siri) still needs per-track volume control on boards
+        // whose audio policy does not duck media for guidance.
+        if (manager == null || channel == AudioChannel.NAVIGATION) return
         active[track] = Entry(channel, attributes)
-        refreshRequest()
+        if (enabled) refreshRequest()
     }
 
     @Synchronized
     fun release(track: AudioTrack) {
-        if (active.remove(track) != null) refreshRequest()
+        if (active.remove(track) != null && enabled) refreshRequest()
     }
+
+    /**
+     * Ducks every participating track while a same-app overlay stream plays. Audio focus cannot
+     * do this: focus is per-app, so the sink's own guidance/Siri stream would not duck the
+     * sink's own media stream, and boards without a usage-aware mixer would overlay at full
+     * volume. Head units that duck in hardware are unaffected: both tracks keep their usage.
+     */
+    @Synchronized
+    fun overlay(playing: Boolean) {
+        val before = overlayCount
+        overlayCount = (overlayCount + if (playing) 1 else -1).coerceAtLeast(0)
+        if ((before == 0) != (overlayCount == 0)) {
+            runCatching {
+                report("Audio: overlay ${if (overlayCount > 0) "ducking" else "restoring"} media")
+            }
+            applyVolumes()
+        }
+    }
+
+    private fun applyVolumes() {
+        val volume = if (externalDuck || overlayCount > 0) DUCKED_VOLUME else FULL_VOLUME
+        active.keys.forEach { track -> runCatching { track.setStereoVolume(volume, volume) } }
+    }
+
+    private var externalDuck = false
+    private var overlayCount = 0
 
     private fun refreshRequest() {
         val primary = active.values.maxByOrNull { it.channel.focusPriority() }
@@ -97,10 +132,6 @@ internal class AudioFocusCoordinator(
         val line = "Audio: focus requested channel=${primary.channel} gain=$gain granted=$result activeTracks=${active.size}"
         Log.i(TAG, line)
         runCatching { report(line) }
-    }
-
-    private fun setVolume(volume: Float) {
-        active.keys.forEach { track -> runCatching { track.setStereoVolume(volume, volume) } }
     }
 
     private fun AudioChannel.focusPriority(): Int = when (this) {
@@ -266,6 +297,7 @@ class AndroidMediaSink(
     }
 
     override fun onAudioStarted(id: AudioStreamId, format: AudioFormat, firstSample: Int) {
+        if (mapsToOverlayChannel(format)) audioFocusCoordinator.overlay(true)
         audioRenderer(id, format).start()
         if (format.audioType == "media") updateMediaAudio(id, true)
     }
@@ -275,8 +307,26 @@ class AndroidMediaSink(
     }
 
     override fun onAudioStopped(id: AudioStreamId) {
-        audioRenderers.remove(id)?.close()
+        val renderer = audioRenderers.remove(id)
+        val wasOverlay = renderer != null && mapsToOverlayChannel(renderer.format)
+        renderer?.close()
+        if (wasOverlay) audioFocusCoordinator.overlay(false)
         updateMediaAudio(id, false)
+    }
+
+    /** Guidance and Siri streams play over media: duck our own media while one is live. */
+    private fun mapsToOverlayChannel(format: AudioFormat): Boolean {
+        val mode = if (advancedAudioChannelMapping) {
+            AudioChannelMappingMode.AUTOMOTIVE_BUS
+        } else {
+            AudioChannelMappingMode.MOBILE_COMPATIBLE
+        }
+        val channel = AudioChannelMapper.map(
+            audioType = format.audioType,
+            payloadType = format.payloadType,
+            mode = mode,
+        ).channel
+        return channel == AudioChannel.NAVIGATION || channel == AudioChannel.ASSISTANT
     }
 
     private fun updateMediaAudio(id: AudioStreamId, active: Boolean) {
@@ -1043,7 +1093,11 @@ private class AudioRenderer(
     /** 0 uses usage-based routing; 1–20 attempt legacy stream types supported by the head unit. */
     private fun channelOverride(channel: AudioChannel): Int = when (channel) {
         AudioChannel.MEDIA -> mediaChannel
-        AudioChannel.NAVIGATION -> navigationChannel
+        // Guidance carries standard navigation usage attributes instead of the BYD driver-speaker
+        // stream (14): that stream is meaningless on other boards, where the prompt either rides
+        // a wrong output or overlays media at full volume, and the audio policy never sees a
+        // navigation stream it could duck.
+        AudioChannel.NAVIGATION -> 0
         else -> 0
     }
 
