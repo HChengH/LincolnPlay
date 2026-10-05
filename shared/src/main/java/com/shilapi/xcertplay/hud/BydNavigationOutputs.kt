@@ -79,6 +79,7 @@ object BydNavigationOutputs {
         }
         if (frame.messageId != BydHudRouteState.ROUTE_GUIDANCE_UPDATE &&
             frame.messageId != BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE) return
+        dumpRouteFrame(frame)
         val owned = frame // Iap2Frame is immutable and defensively copies its payload.
         updateOverlay(owned)
         if (useStandalone) standalone.submit { BydStandaloneNavigationBridge.onFrame(owned) }
@@ -88,6 +89,26 @@ object BydNavigationOutputs {
         }
         amap.submit { AmapAutoNavigationBridge.onFrame(owned) }
     }
+
+    /**
+     * Bounded raw dumps for car-side protocol calibration: maneuver updates (0x5202) always,
+     * route updates (0x5201) at most every 5 s. The TLV layout was reverse-engineered on older
+     * iOS; a constant wrong arrow with correct distance means this iOS changed it.
+     */
+    private fun dumpRouteFrame(frame: Iap2Frame) {
+        val maneuver = frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE
+        val now = System.currentTimeMillis()
+        if (!maneuver) {
+            if (now - lastRouteUpdateDumpAt < 5_000) return
+            lastRouteUpdateDumpAt = now
+        }
+        val hex = frame.payload.joinToString("") { "%02x".format(it) }
+        com.shilapi.xcertplay.DiagnosticSnifferHook.post(
+            "Amap raw ${if (maneuver) "0x5202" else "0x5201"} ${frame.payload.size}B $hex",
+        )
+    }
+
+    private var lastRouteUpdateDumpAt = 0L
 
     /** Live next-turn state for the dashboard overlay. Called from the iAP2 thread. */
     fun setTurnOverlayListener(listener: ((ClusterTurnGuidance?) -> Unit)?) {

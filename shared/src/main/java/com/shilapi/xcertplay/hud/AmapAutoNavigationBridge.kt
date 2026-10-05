@@ -71,7 +71,8 @@ internal object AmapAutoNavigationBridge {
             if (lastSent != null) sendEndLocked()
             return
         }
-        val frame = route.currentApple()?.let(BydClusterFrame::from)
+        val apple = route.currentApple()
+        val frame = apple?.let(BydClusterFrame::from)
         if (frame == null) {
             if (lastSent != null) sendEndLocked()
             return
@@ -79,9 +80,11 @@ internal object AmapAutoNavigationBridge {
         if (!force && frame == lastSent) return
         if (broadcastLocked(appContext, guidanceIntent(frame))) {
             // Every distinct frame lands in the exportable log next to the sniffer's ground
-            // truth, so a wrong arrow on the cluster is attributable: did we send the wrong
-            // NEW_ICON, or does this decoder's icon table differ from BYD's?
-            com.shilapi.xcertplay.DiagnosticSnifferHook.post("Amap out: $frame")
+            // truth and the raw 0x5201/0x5202 dumps, so a wrong arrow on the cluster is
+            // attributable end to end.
+            com.shilapi.xcertplay.DiagnosticSnifferHook.post(
+                "Amap out: appleType=${apple.type} side=${apple.drivingSide} -> $frame",
+            )
             lastSent = frame
             ticksSinceSend = 0
             if (!guidanceLogged) {
