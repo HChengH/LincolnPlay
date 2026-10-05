@@ -3633,7 +3633,10 @@ class CarPlayHostActivity : ComponentActivity() {
         3 -> 17 to 5   // dongle 03 jili
         4 -> 5 to 2    // dongle 04 hengchen
         5 -> 12 to 1   // dongle 05 dfrc (the user's tuned choice)
-        else -> 1 to 2 // media bus, clear on this ROM
+        // Same dfrc pick as 05: with prompts negotiated wideband (see AirPlayInfoPlist)
+        // the guidance usage no longer muffles them, restoring a volume path the
+        // media bus cannot offer. The media bus stays one revert away if 8 kHz returns.
+        else -> 12 to 1
     }
 
     private fun createMediaSink(
