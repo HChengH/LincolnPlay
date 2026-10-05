@@ -356,7 +356,8 @@ class AndroidMediaSink(
      * success but never attenuates). Scales the media renderer's samples directly.
      */
     private fun applyOverlayGain(active: Boolean) {
-        val target = if (active) 0.25f else 1f
+        // Duck depth tuned on the car: 0.25 was not low enough for the user.
+        val target = if (active) 0.12f else 1f
         var ducked = 0
         for (renderer in audioRenderers.values) {
             if (renderer.channel() == AudioChannel.MEDIA) {
