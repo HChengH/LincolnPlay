@@ -100,6 +100,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 sealed class CarPlayStatus {
@@ -1733,6 +1734,9 @@ class CarPlayController(
                                 "reenumerationAttempts=$reenumerationAttempts " +
                                 "reenumerationPerformed=$reenumerationPerformed " +
                                 "action=${when {
+                                    forceReenumerationAfterFailure() && configuration != null &&
+                                        reenumerationAttempts < MAXIMUM_REENUMERATION_ATTEMPTS ->
+                                        "force-transition-after-failure"
                                     configuration != null && (!reenumerationPerformed ||
                                         reenumerationAttempts >= MAXIMUM_REENUMERATION_ATTEMPTS) -> "reuse-descriptors"
                                     configuration != null -> "request-transition-stale-configuration"
@@ -1741,6 +1745,18 @@ class CarPlayController(
                                 }}",
                         )
                         when {
+                            // A wired attempt just failed and the phone re-attached into its stale
+                            // CarPlay configuration (quick replug): those endpoints swallow the first
+                            // session writes. Force the transition once; the attempt cap and the
+                            // fallback keep phones that ignore it on the reuse path.
+                            forceReenumerationAfterFailure() && configuration != null &&
+                                reenumerationAttempts < MAXIMUM_REENUMERATION_ATTEMPTS -> {
+                                debugLog(
+                                    "wired recent failure; re-enumerating instead of reusing the " +
+                                        "attached CarPlay configuration",
+                                )
+                                beginReenumeration(result.device)
+                            }
                             // Only a reconnect within this run can see a stale leftover
                             // configuration (see openedWiredDataPaths); a fresh plug-in exposes a
                             // clean one and must be used directly.
@@ -1911,6 +1927,7 @@ class CarPlayController(
                         return@openIap2UsbSessionAsync
                     }
                     wiredUsbSession = result.session
+                    wiredFailureAt.set(0L)
                     try {
                         val ncm = openNcm(device)
                         runStack(result.session, ncm, generation)
@@ -2595,11 +2612,22 @@ class CarPlayController(
                 firstTcpWatchdog?.terminate()
             }
             val causes = generateSequence(error) { it.cause }.toList()
+            // A quick replug re-attaches the phone straight into its previous CarPlay
+            // configuration, whose endpoints no longer accept writes; reusing it costs a
+            // doomed attempt (1.9s write stall) before the retry re-enumerates anyway.
+            if (!wireless) wiredFailureAt.set(System.currentTimeMillis())
             onStatus(CarPlayStatus.Failed(error.message ?: error.javaClass.simpleName,
                 causes.any { it is com.shilapi.xcertplay.network.P2pResetRequiredException },
                 causes.filterIsInstance<WirelessStartupException>().firstOrNull()?.reason),
                 if (wireless) wirelessGeneration.get() else null)
         }
+    }
+
+    /** Whether the last wired failure is recent enough that a stale re-attach must be re-enumerated. */
+    private fun forceReenumerationAfterFailure(): Boolean {
+        val failedAt = wiredFailureAt.get()
+        return failedAt != 0L &&
+            System.currentTimeMillis() - failedAt < FORCE_REENUMERATION_AFTER_FAILURE_MILLIS
     }
 
     private fun debugLog(message: String) {
@@ -2716,6 +2744,8 @@ class CarPlayController(
         private const val MAXIMUM_REENUMERATION_ATTEMPTS = 2
         private const val REENUMERATION_POLL_INTERVAL_MILLIS = 400L
         private const val REENUMERATION_FALLBACK_MILLIS = 8_000L
+        private const val FORCE_REENUMERATION_AFTER_FAILURE_MILLIS = 60_000L
+        private val wiredFailureAt = AtomicLong(0)
         private const val EXECUTOR_CLOSE_TIMEOUT_MILLIS = 2_000L
         private const val ADAPTER_ADDRESS_PLACEHOLDER = "02:00:00:00:00:00"
         private val BLUETOOTH_ADDRESS = Regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")

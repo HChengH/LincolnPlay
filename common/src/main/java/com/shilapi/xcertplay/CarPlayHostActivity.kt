@@ -1122,11 +1122,17 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        // Spontaneous disconnects start with the system displacing this activity; the
+        // lifecycle trail in the session log identifies the killer next time it happens.
+        sessionLog?.append("Activity paused finishing=$isFinishing")
         nightModeController.pause()
         super.onPause()
     }
 
     override fun onStop() {
+        sessionLog?.append(
+            "Activity stopped finishing=$isFinishing changingConfigurations=$isChangingConfigurations",
+        )
         closePicturePanel()
         // The controller, USB/iAP2 link, and VPN attachment intentionally outlive the UI.
         isActivityStarted = false
@@ -1252,7 +1258,9 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         currentSurface = null
         currentSurfaceTexture = null
-        sessionLog?.append("Activity destroyed")
+        sessionLog?.append(
+            "Activity destroyed finishing=$isFinishing changingConfigurations=$isChangingConfigurations",
+        )
         sessionLog?.close()
         sessionLog = null
         super.onDestroy()
@@ -4368,6 +4376,7 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun shutdown(terminateProcess: Boolean, reason: String, completion: () -> Unit = {}) {
         if (!shuttingDown.compareAndSet(false, true)) { completion(); return }
+        sessionLog?.append("Shutdown: $reason terminateProcess=$terminateProcess")
         startupRetryBudget.disconnected()
         restartGeneration += 1
         mainHandler.removeCallbacks(applyDisplaySize)
