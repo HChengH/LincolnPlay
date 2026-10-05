@@ -4141,6 +4141,11 @@ class CarPlayHostActivity : ComponentActivity() {
             setScale(content.width / viewWidth, content.height / viewHeight)
             postTranslate(content.left, content.top)
         })
+        // Opaque composition requires the transformed surface to cover the whole view;
+        // letterboxed layouts (aspect-adapted streams) fall back to blended transparency,
+        // where the uncovered strips stay transparent over the black root.
+        view.isOpaque = content.left <= 1f && content.top <= 1f &&
+            content.width >= viewWidth - 1f && content.height >= viewHeight - 1f
     }
 
     private fun recordDetectedMaximum(size: DisplaySize) {
