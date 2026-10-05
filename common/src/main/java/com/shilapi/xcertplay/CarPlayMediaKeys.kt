@@ -234,6 +234,9 @@ internal object CarPlayMediaKeys {
         Log.i(TAG, "media key $source -> CarPlay $index sent=$sent")
     }
 
+    /** Vendor wheel keys arrive at the window, not the media session; the host activity routes them here. */
+    fun onHardwareMediaKey(index: Int, source: String) = send(index, source)
+
     private val callback = CarPlayMediaCallback(::send)
 
     /** Whether [next] changes what the media session's metadata shows; position and play state do not. */

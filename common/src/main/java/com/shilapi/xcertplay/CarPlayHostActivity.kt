@@ -1073,6 +1073,20 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         logKeyEvent(event)
+        // This board's decoder maps the steering-wheel track buttons to custom keycodes that
+        // Android does not route to media sessions; captured on the car: 297 = previous, 298 = next.
+        val wheelMediaIndex = when (event.keyCode) {
+            WHEEL_KEY_PREVIOUS -> CarPlayMediaButton.PREVIOUS
+            WHEEL_KEY_NEXT -> CarPlayMediaButton.NEXT
+            else -> null
+        }
+        if (wheelMediaIndex != null) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                appendLog("Wheel key ${event.keyCode} -> media $wheelMediaIndex")
+                CarPlayMediaKeys.onHardwareMediaKey(wheelMediaIndex, "wheel-${event.keyCode}")
+            }
+            return true
+        }
         if (!menuOpen && AndroidTvInputMode.shouldUseKnobAsPrimaryInput(this) &&
             CarPlayRemoteKeys.dispatch(event, controller)) {
             if (event.repeatCount == 0) {
@@ -4661,6 +4675,9 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private companion object {
         const val TAG = "xcertplay-usb"
+        // Steering-wheel track buttons on the freescale MEK-MX8Q board (captured on the car).
+        private const val WHEEL_KEY_PREVIOUS = 297
+        private const val WHEEL_KEY_NEXT = 298
         const val SCREEN_TYPE_MAIN = 110
         const val SCREEN_TYPE_ALT = 111
         private const val CENTER_MAP_IDLE_MILLIS = 3_000L // a reconnect is quicker; a session end is not
