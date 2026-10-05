@@ -579,16 +579,6 @@ class DiPlayActivity : ComponentActivity() {
             ), duckPresets.indexOf(AirPlayPersistence.loadGuidanceDuckPercent(this)).coerceAtLeast(0), reconnects = false) {
                 AirPlayPersistence.saveGuidanceDuckPercent(this, duckPresets[it])
             }
-            choice(card, getString(R.string.guidance_audio_channel), listOf(
-                getString(R.string.guidance_preset_media),
-                getString(R.string.guidance_preset_01),
-                getString(R.string.guidance_preset_02),
-                getString(R.string.guidance_preset_03),
-                getString(R.string.guidance_preset_04),
-                getString(R.string.guidance_preset_05),
-            ), AirPlayPersistence.loadGuidanceAudioPreset(this)) {
-                AirPlayPersistence.saveGuidanceAudioPreset(this, it)
-            }
         }
         section(content, getString(R.string.amap_navigation), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.amap_navigation_output),
