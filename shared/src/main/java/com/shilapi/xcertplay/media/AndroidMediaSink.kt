@@ -489,6 +489,7 @@ class AndroidMediaSink(
             navigationStreamType,
             mediaBufferMillis,
             onAudioDiagnostic,
+            guidanceAttributes,
         ).also { audioRenderers[id] = it }
     }
 }
@@ -876,6 +877,7 @@ private class AudioRenderer(
     private val navigationStreamType: Int,
     private val mediaBufferMillis: Int,
     private val report: (String) -> Unit,
+    private val guidanceAttributes: () -> Pair<Int, Int> = { 1 to 2 },
 ) : Closeable {
     private data class AudioPacket(val rtp: ByteArray, val sample: Int)
 
