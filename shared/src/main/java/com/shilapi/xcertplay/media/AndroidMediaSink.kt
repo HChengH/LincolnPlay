@@ -1244,7 +1244,11 @@ private class AudioRenderer(
         // VOICE_COMMUNICATION (tengshi preset "02"); match the empirically working choice.
         AudioChannel.PHONE -> AudioAttributes.USAGE_NOTIFICATION_RINGTONE
         AudioChannel.ASSISTANT -> AudioAttributes.USAGE_ASSISTANT
-        AudioChannel.NAVIGATION -> AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE
+        // The dongle's audioGeneralConfig default plays prompts on the MEDIA bus (usage 1),
+        // and its guidance sounds clear on this board; this ROM's guidance usage audibly
+        // muffles the stream (voice-chain processing). PCM ducking does not need usage
+        // separation, so follow the dongle default.
+        AudioChannel.NAVIGATION -> AudioAttributes.USAGE_MEDIA
     }
 
     private fun contentTypeFor(contentType: AudioContentType): Int = when (contentType) {
