@@ -54,6 +54,7 @@ internal object CarPlayMediaKeys {
     private var appContext: Context? = null
     private var mediaAudioActive = false
     private var nowPlaying = CarPlayNowPlaying()
+    private var clusterSong: ClusterSongPublisher? = null
     private var elapsedUpdatedAt = 0L
     private var artwork: Bitmap? = null
     private val artworkCache = LinkedHashMap<Int, Bitmap?>()
@@ -115,6 +116,10 @@ internal object CarPlayMediaKeys {
                 // minutes. The position goes in the playback state.
                 if (metadataChanged) session?.setMetadata(androidMetadata(update, shownArtworkLocked()))
                 publishPlaybackStateLocked()
+                clusterSong?.onNowPlaying(
+                    update,
+                    if (update.elapsedMillis != null || update.title != null) update.playing else mediaAudioActive,
+                )
             }
         }
     }
@@ -156,6 +161,11 @@ internal object CarPlayMediaKeys {
         if (controller == null) return
         mediaAudioActive = active
         if (active && session == null) start(context) else if (active) regainFocusLocked()
+        if (active && clusterSong == null) {
+            clusterSong = ClusterSongPublisher(context) {
+                AirPlayPersistence.loadClusterSongEnabled(context)
+            }
+        }
         publishPlaybackStateLocked()
     }
 
@@ -194,6 +204,8 @@ internal object CarPlayMediaKeys {
         }
         session = null
         mediaAudioActive = false
+        clusterSong?.release()
+        clusterSong = null
         nowPlaying = CarPlayNowPlaying()
         artwork = null
         artworkCache.clear()

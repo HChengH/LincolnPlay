@@ -670,6 +670,8 @@
     <string name="duck_depth_light">Light (25% volume)</string>
     <string name="duck_depth_default">Default (12% volume)</string>
     <string name="duck_depth_deep">Deep (6% volume)</string>
+    <string name="cluster_song">Cluster song info</string>
+    <string name="cluster_song_description">Shows the iPhone's now-playing title and artist on the instrument cluster song widget, like Bluetooth audio</string>
     <string name="guidance_audio_channel">Navigation prompt channel</string>
     <string name="guidance_preset_media">Media bus (clear here, shared volume)</string>
     <string name="guidance_preset_01">Dongle preset 01 (default)</string>

@@ -658,6 +658,11 @@ class DiPlayActivity : ComponentActivity() {
             ), duckPresets.indexOf(AirPlayPersistence.loadGuidanceDuckPercent(this)).coerceAtLeast(0), reconnects = false) {
                 AirPlayPersistence.saveGuidanceDuckPercent(this, duckPresets[it])
             }
+            toggle(card, getString(R.string.cluster_song),
+                getString(R.string.cluster_song_description),
+                AirPlayPersistence.loadClusterSongEnabled(this)) {
+                AirPlayPersistence.saveClusterSongEnabled(this, it)
+            }
         }
         section(content, getString(R.string.amap_navigation), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.amap_navigation_output),
