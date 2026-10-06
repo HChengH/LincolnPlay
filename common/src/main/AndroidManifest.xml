@@ -67,6 +67,21 @@
                 android:resource="@xml/usb_device_filter" />
         </activity>
 
+        <!-- Independent CarPlay launcher entry: taps bring the existing CarPlay task
+             to the front (singleTask, no recreation). Without a session the host
+             shows its waiting screen and connects on cable attach. -->
+        <activity-alias
+            android:name="com.shilapi.xcertplay.CarPlayLauncher"
+            android:targetActivity="com.shilapi.xcertplay.CarPlayHostActivity"
+            android:label="@string/carplay_launcher_label"
+            android:icon="@drawable/ic_carplay"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <activity
             android:name="com.shilapi.xcertplay.AdbClusterActivity"
             android:label="@string/adb_cluster_activity_label"

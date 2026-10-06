@@ -123,6 +123,11 @@ class CarPlayHostActivity : ComponentActivity() {
         val customIconBytes: ByteArray?,
     )
 
+    /** Sent by BootReceiver and USB attach to connect without showing any UI until ready. */
+    companion object {
+        const val EXTRA_SILENT_CONNECT = "com.shilapi.xcertplay.EXTRA_SILENT_CONNECT"
+    }
+
     private var connectionPanel: View? = null
     private var connectionIconView: ImageView? = null
     private var connectionTitleView: TextView? = null
@@ -377,6 +382,8 @@ class CarPlayHostActivity : ComponentActivity() {
     private var navigationStreamType = 14
     private var debugLogsEnabled = false
     private var autoStartOnBoot = false
+    /** True while the host should stay invisible until CarPlay is ready to show. */
+    private var silentConnect = false
     private var manufacturer = AirPlayPersistence.DEFAULT_MANUFACTURER
     private var model = AirPlayPersistence.DEFAULT_MODEL
     private var oemLabel = AirPlayPersistence.DEFAULT_OEM_LABEL
@@ -597,7 +604,10 @@ class CarPlayHostActivity : ComponentActivity() {
                     } else if (menuOpen) {
                         if (safeAreaEditorActive) closeSafeAreaEditor() else cancelSettingsEdits()
                     } else {
-                        showDiPlayHome()
+                        // Like native CarPlay: going back to the car backgrounds the whole
+                        // task. The session (audio, USB, navigation) keeps running; tapping
+                        // the CarPlay icon or re-attaching the cable brings it right back.
+                        moveTaskToBack(true)
                     }
                 }
             },
@@ -607,6 +617,14 @@ class CarPlayHostActivity : ComponentActivity() {
             "Host started; MFI target=${mfiTargetLabel(mfiTarget)}; " +
                 "transport=${if (wirelessEnabled) "wireless" else "wired"}",
         )
+        // Boot auto-start and USB attach both arrive silently: connect behind the launcher
+        // and surface only when the AirPlay session is active. The user's launcher,
+        // radio or navigation stays on top and fully interactive until then.
+        silentConnect = intent?.getBooleanExtra(EXTRA_SILENT_CONNECT, false) ?: false
+        if (silentConnect && !isFinishing) {
+            moveTaskToBack(true)
+            appendLog("Silent connect: staying behind the launcher until CarPlay is ready")
+        }
         val reusedBackgroundSession = adoptBackgroundSession()
         microphoneAvailable =
             checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -3865,6 +3883,15 @@ class CarPlayHostActivity : ComponentActivity() {
                     syncAirPlayDarkMode(ThemeModeDiagnostics.Source.SESSION_ACTIVE)
                     if (menuOpen) return@runOnUiThread
                     appendLog("AirPlay session active")
+                    // The silent-connect host surfaces now: CarPlay is ready to show.
+                    if (silentConnect) {
+                        silentConnect = false
+                        runCatching {
+                            startActivity(Intent(this@CarPlayHostActivity, CarPlayHostActivity::class.java)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+                        }
+                        appendLog("Silent connect: surfacing CarPlay")
+                    }
                 }
             }
 
