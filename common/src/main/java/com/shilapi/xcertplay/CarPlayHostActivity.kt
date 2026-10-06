@@ -539,20 +539,6 @@ class CarPlayHostActivity : ComponentActivity() {
         nightModeOrNull(resources.configuration.uiMode)?.let { lastObservedUiNight = it }
         DiagnosticSnifferHook.line = { appendLog(it) }
         startDebugSniffer()
-        // Amap-style headlamp dialect repository: whichever vendor day/night signal this
-        // board speaks drives night mode directly; the ambient sensor stays the fallback.
-        HeadLampDialects.attach(this) { night, source ->
-            // Broadcast receivers must never throw: an uncaught exception here kills the
-            // process outright, bypassing every in-app failure surface.
-            runCatching {
-                appendLog("Head-unit day/night: source=$source night=$night")
-                lastHeadUnitNightAt = SystemClock.elapsedRealtime()
-                nightModeController.external(night)
-            }.onFailure { error ->
-                Log.e(TAG, "head-unit day/night signal failed", error)
-                appendLog("Head-unit day/night signal failed: ${error.javaClass.simpleName}")
-            }
-        }
         logEnvironmentDiagnostics()
         lastConfiguration = Configuration(resources.configuration)
         darkMode = savedInstanceState?.getBoolean("carplay_night_active")
@@ -1314,7 +1300,6 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onDestroy() {
         resetSidePanel()
         nightModeController.pause()
-        HeadLampDialects.detach()
         pictureBinding?.close()
         pictureBinding = null
         mainHandler.removeCallbacks(refreshTurnOverlay)
@@ -3744,19 +3729,6 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun normalizedModel(): String =
         model.trim().ifBlank { AirPlayPersistence.DEFAULT_MODEL }
 
-    /** Dongle preset table: media bus plus vendor presets 01..05 as (usage, contentType). */
-    private fun guidanceAttributesForPreset(preset: Int): Pair<Int, Int> = when (preset) {
-        1 -> 12 to 2   // dongle 01 default
-        2 -> 10 to 2   // dongle 02 tengshi
-        3 -> 17 to 5   // dongle 03 jili
-        4 -> 5 to 2    // dongle 04 hengchen
-        5 -> 12 to 1   // dongle 05 dfrc (the user's tuned choice)
-        // Same dfrc pick as 05: with prompts negotiated wideband (see AirPlayInfoPlist)
-        // the guidance usage no longer muffles them, restoring a volume path the
-        // media bus cannot offer. The media bus stays one revert away if 8 kHz returns.
-        else -> 12 to 1
-    }
-
     private fun createMediaSink(
         videoWidth: Int,
         videoHeight: Int,
@@ -3788,7 +3760,10 @@ class CarPlayHostActivity : ComponentActivity() {
             },
             onMediaAudioChanged = CarPlayMediaKeys::onMediaAudioChanged,
             guidanceDuckGain = { AirPlayPersistence.loadGuidanceDuckPercent(this) / 100f },
-            guidanceAttributes = { guidanceAttributesForPreset(AirPlayPersistence.loadGuidanceAudioPreset(this)) },
+            // The dongle's dfrc pick (12/1): with prompts negotiated wideband (see
+            // AirPlayInfoPlist) the guidance usage no longer muffles them, keeping a volume
+            // path the media bus cannot offer.
+            guidanceAttributes = { 12 to 1 },
         )
     }
 
@@ -4130,31 +4105,23 @@ class CarPlayHostActivity : ComponentActivity() {
         )?.let(::appendLog)
     }
 
-    private var lastHeadUnitNightAt = 0L
     private var lastBaselineRefreshAt = 0L
     private var lastKnownTwilightLocation: Pair<Double, Double>? = null
 
     /**
-     * The day/night baseline without a transition: Amap-style current-state probes first
-     * (its adapters' e() queries), then the sunrise equation as the prior. The board's
-     * uiMode is stuck and its DayNightStatus broadcast only fires on change, so this is
-     * what makes the state correct at connect; dialect transitions refine it afterwards.
+     * The day/night prior when no transition has been seen: the sunrise equation. This
+     * board reports a permanently-night uiMode and has no system day/night broadcasts at
+     * all (verified with wide-net sniffers), so the state at connect and across dusk comes
+     * from here; the ambient sensor then refines it in AMBIENT mode.
      */
-    private fun headUnitDayNightBaseline(): Boolean =
-        HeadLampDialects.currentNight(this) ?: twilightNight()
+    private fun headUnitDayNightBaseline(): Boolean = twilightNight()
 
-    /** Periodic re-baseline; a recent dialect signal means the car state already owns the mode. */
+    /** Periodic re-baseline keeps long sessions aligned with the sun. */
     private fun refreshDayNightBaseline() {
         val now = SystemClock.elapsedRealtime()
         if (now - lastBaselineRefreshAt < DAY_NIGHT_BASELINE_INTERVAL_MILLIS) return
         lastBaselineRefreshAt = now
-        if (now - lastHeadUnitNightAt < HEAD_UNIT_SIGNAL_YIELD_MILLIS) return
-        val probed = HeadLampDialects.currentNight(this)
-        if (probed != null) {
-            nightModeController.external(probed)
-        } else {
-            nightModeController.systemChanged(twilightNight())
-        }
+        nightModeController.systemChanged(twilightNight())
     }
 
     private fun twilightNight(): Boolean =
@@ -4800,16 +4767,6 @@ class CarPlayHostActivity : ComponentActivity() {
                 .getMethod("start", Context::class.java)
                 .invoke(null, applicationContext)
         }
-        runCatching {
-            Class.forName("com.shilapi.xcertplay.diag.DayNightSignalSniffer")
-                .getMethod("start", Context::class.java)
-                .invoke(null, applicationContext)
-        }
-        runCatching {
-            Class.forName("com.shilapi.xcertplay.diag.SettingsDiffSniffer")
-                .getMethod("start", Context::class.java)
-                .invoke(null, applicationContext)
-        }
     }
 
     private fun setStatus(message: String) {
@@ -4985,7 +4942,6 @@ class CarPlayHostActivity : ComponentActivity() {
         const val DISPLAY_CHANGE_DEBOUNCE_MILLIS = 500L
         const val CONFIGURATION_POLL_INTERVAL_MILLIS = 2_000L
         const val DAY_NIGHT_BASELINE_INTERVAL_MILLIS = 10 * 60_000L
-        const val HEAD_UNIT_SIGNAL_YIELD_MILLIS = 30 * 60_000L
         const val RECONNECT_DELAY_MILLIS = 2_000L
         const val IAP_TUNNEL_RECONNECT_DELAY_MILLIS = 15_000L
         const val CONTROLLER_CLOSE_TIMEOUT_MILLIS = 4_000L

@@ -672,13 +672,6 @@
     <string name="duck_depth_deep">Deep (6% volume)</string>
     <string name="cluster_now_playing">Cluster now-playing card</string>
     <string name="cluster_now_playing_description">Shows the iPhone now-playing title and artist on the instrument cluster song widget, like Bluetooth audio</string>
-    <string name="guidance_audio_channel">Navigation prompt channel</string>
-    <string name="guidance_preset_media">Media bus (clear here, shared volume)</string>
-    <string name="guidance_preset_01">Dongle preset 01 (default)</string>
-    <string name="guidance_preset_02">Dongle preset 02 (tengshi)</string>
-    <string name="guidance_preset_03">Dongle preset 03 (jili)</string>
-    <string name="guidance_preset_04">Dongle preset 04 (hengchen)</string>
-    <string name="guidance_preset_05">Dongle preset 05 (dfrc, your tuned choice)</string>
     <string name="carplay_dock">CarPlay dock</string>
     <string name="carplay_dock_automatic">Automatic</string>
     <string name="carplay_dock_driver_side">Driver\'s side</string>

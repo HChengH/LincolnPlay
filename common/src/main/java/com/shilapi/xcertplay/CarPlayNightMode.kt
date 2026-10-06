@@ -39,18 +39,12 @@ internal class CarPlayNightModeController(
     private var resumed = false
     private var listening = false
     private var pending: Boolean? = null
-    private var externalHold = false
-    private val externalRelease = Runnable { externalHold = false }
     private val transition = Runnable {
         val target = pending
         pending = null
         if (resumed && listening && mode == CarPlayNightMode.AMBIENT && target != null) {
             applyNight(target)
         }
-    }
-
-    private companion object {
-        const val EXTERNAL_HOLD_MILLIS = 30_000L
     }
 
     fun configure(
@@ -85,21 +79,6 @@ internal class CarPlayNightModeController(
         if (mode == CarPlayNightMode.SYSTEM || ambientFallback) applyNight(night)
     }
 
-    /**
-     * A vendor headlamp signal (Amap's dialect repository) applies at once, like Amap's
-     * direct setHeadLampStatus: it wins over both the stale uiMode and the ambient sensor.
-     * The sensor stays muted for a hold so it cannot immediately flip the override back;
-     * forced DAY/NIGHT remain manual overrides the dialects cannot touch.
-     */
-    fun external(night: Boolean) {
-        if (mode == CarPlayNightMode.DAY || mode == CarPlayNightMode.NIGHT) return
-        externalHold = true
-        scheduler.remove(externalRelease)
-        scheduler.postDelayed(externalRelease, EXTERNAL_HOLD_MILLIS)
-        cancelPending()
-        applyNight(night)
-    }
-
     private fun applyMode() {
         when (mode) {
             CarPlayNightMode.SYSTEM -> applyNight(systemNight)
@@ -120,7 +99,7 @@ internal class CarPlayNightModeController(
     }
 
     private fun onLux(lux: Float) {
-        if (!resumed || !listening || mode != CarPlayNightMode.AMBIENT || externalHold) return
+        if (!resumed || !listening || mode != CarPlayNightMode.AMBIENT) return
         val nightAt = threshold.lux.toFloat()
         val dayAt = threshold.dayLux
         val target = when {

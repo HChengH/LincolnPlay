@@ -611,13 +611,6 @@
     <string name="duck_depth_light">Слабо (25% громкости)</string>
     <string name="duck_depth_default">По умолчанию (12% громкости)</string>
     <string name="duck_depth_deep">Сильно (6% громкости)</string>
-    <string name="guidance_audio_channel">Канал голосовых подсказок</string>
-    <string name="guidance_preset_media">Шина медиа (здесь чисто, общая громкость)</string>
-    <string name="guidance_preset_01">Пресет бокса 01 (default)</string>
-    <string name="guidance_preset_02">Пресет бокса 02 (tengshi)</string>
-    <string name="guidance_preset_03">Пресет бокса 03 (jili)</string>
-    <string name="guidance_preset_04">Пресет бокса 04 (hengchen)</string>
-    <string name="guidance_preset_05">Пресет бокса 05 (dfrc, ваш выбор)</string>
     <string name="carplay_dock">Панель приложений CarPlay</string>
     <string name="carplay_dock_automatic">Автоматически</string>
     <string name="carplay_dock_driver_side">Со стороны водителя</string>

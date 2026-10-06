@@ -672,13 +672,6 @@
     <string name="duck_depth_deep">深度（保留6%音量）</string>
     <string name="cluster_now_playing">仪表歌曲信息</string>
     <string name="cluster_now_playing_description">在仪表歌曲栏显示 iPhone 正在播放的歌名和歌手（蓝牙音乐式兜底显示，无需联网）</string>
-    <string name="guidance_audio_channel">导航提示音通道</string>
-    <string name="guidance_preset_media">媒体总线（本机清亮，音量与音乐共用）</string>
-    <string name="guidance_preset_01">互联盒配置01（默认）</string>
-    <string name="guidance_preset_02">互联盒配置02（tengshi）</string>
-    <string name="guidance_preset_03">互联盒配置03（jili）</string>
-    <string name="guidance_preset_04">互联盒配置04（hengchen）</string>
-    <string name="guidance_preset_05">互联盒配置05（dfrc，你调好的那档）</string>
     <string name="carplay_dock">CarPlay 程序栏</string>
     <string name="carplay_dock_automatic">自动</string>
     <string name="carplay_dock_driver_side">驾驶员一侧</string>

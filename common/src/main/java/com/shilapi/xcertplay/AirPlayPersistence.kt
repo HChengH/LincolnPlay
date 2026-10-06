@@ -45,7 +45,6 @@ object AirPlayPersistence {
     private const val KEY_ADVANCED_AUDIO_CHANNEL_MAPPING = "advanced_audio_channel_mapping"
     private const val KEY_AUDIO_FOCUS_ENABLED = "audio_focus_enabled"
     private const val KEY_GUIDANCE_DUCK_PERCENT = "guidance_duck_percent"
-    private const val KEY_GUIDANCE_AUDIO_PRESET = "guidance_audio_preset"
     private const val KEY_CLUSTER_SONG_ENABLED = "cluster_song_enabled"
     private const val KEY_MEDIA_AUDIO_CHANNEL = "media_audio_channel"
     private const val KEY_NAVIGATION_AUDIO_CHANNEL = "navigation_audio_channel"
@@ -215,20 +214,6 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getInt(KEY_GUIDANCE_DUCK_PERCENT, 12)
                 .coerceIn(2, 50)
-
-    /**
-     * Guidance (usage, contentType) preset: 0 media-bus 1/2 (clear here), 1..5 mirror the dongle
-     * app's vendor presets 01..05: 12/2, 10/2, 17/5, 5/2, 12/1 (the user's tuned choice was 05).
-     */
-    fun loadGuidanceAudioPreset(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt(KEY_GUIDANCE_AUDIO_PRESET, 0).coerceIn(0, 5)
-
-    fun saveGuidanceAudioPreset(context: Context, preset: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt(KEY_GUIDANCE_AUDIO_PRESET, preset.coerceIn(0, 5))
-            .apply()
-    }
 
     /** Instrument-cluster song widget via the PLAY_INFO radio broadcast. */
     fun loadClusterSongEnabled(context: Context): Boolean =

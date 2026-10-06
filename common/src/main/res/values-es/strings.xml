@@ -611,13 +611,6 @@
     <string name="duck_depth_light">Suave (25% de volumen)</string>
     <string name="duck_depth_default">Predeterminado (12% de volumen)</string>
     <string name="duck_depth_deep">Profundo (6% de volumen)</string>
-    <string name="guidance_audio_channel">Canal de indicaciones de navegación</string>
-    <string name="guidance_preset_media">Bus de medios (claro aquí, volumen compartido)</string>
-    <string name="guidance_preset_01">Preset del dongle 01 (default)</string>
-    <string name="guidance_preset_02">Preset del dongle 02 (tengshi)</string>
-    <string name="guidance_preset_03">Preset del dongle 03 (jili)</string>
-    <string name="guidance_preset_04">Preset del dongle 04 (hengchen)</string>
-    <string name="guidance_preset_05">Preset del dongle 05 (dfrc, tu elección)</string>
     <string name="carplay_dock">Dock de CarPlay</string>
     <string name="carplay_dock_automatic">Automático</string>
     <string name="carplay_dock_driver_side">Lado del conductor</string>
