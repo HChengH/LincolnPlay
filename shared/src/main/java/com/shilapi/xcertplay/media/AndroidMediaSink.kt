@@ -1008,22 +1008,38 @@ private class AudioRenderer(
             throw error
         } finally {
             runCatching { logStatsIfDue(force = true) }
-            if (drainOnClose) drainTrack()
+            if (drainOnClose) {
+                drainTrack()
+            } else {
+                runCatching { onDrained?.invoke() }
+            }
             release()
-            runCatching { onDrained?.invoke() }
         }
     }
 
-    /** Bounded wait for the track to play what was written into it. */
+    /**
+     * Bounded wait for the track to play what was written into it. The duck releases early,
+     * while the prompt's last fraction is still sounding: the media track's ~500 ms buffer
+     * latency means the recovered music only reaches the ears after the prompt has finished
+     * anyway, so waiting for the full tail here just added that latency to every recovery.
+     */
     private fun drainTrack() {
         val audioTrack = track ?: return
         if (totalWrittenFrames <= 0L) return
+        val earlyReleaseFrames = format.sampleRate.toLong() * DUCK_EARLY_RELEASE_MILLIS / 1_000
+        val releaseAt = (totalWrittenFrames - earlyReleaseFrames).coerceAtLeast(totalWrittenFrames / 2)
+        var released = false
         val deadline = System.nanoTime() + DRAIN_TIMEOUT_NS
         while (System.nanoTime() < deadline) {
             val played = audioTrack.playbackHeadPosition.toLong().and(0xffff_ffffL)
+            if (!released && played >= releaseAt) {
+                released = true
+                runCatching { onDrained?.invoke() }
+            }
             if (played >= totalWrittenFrames) return
             Thread.sleep(20)
         }
+        if (!released) runCatching { onDrained?.invoke() }
     }
 
     private fun configureCodec(mime: String) {
@@ -1685,6 +1701,7 @@ private class AudioRenderer(
     private companion object {
         const val TAG = "xcertplay-usb"
         const val DRAIN_TIMEOUT_NS = 2_000_000_000L
+        const val DUCK_EARLY_RELEASE_MILLIS = 400L
         const val DUCK_RAMP_MILLIS = 120
         const val RECOVER_RAMP_MILLIS = 220
         const val AAC_OBJECT_TYPE_LC = 2
