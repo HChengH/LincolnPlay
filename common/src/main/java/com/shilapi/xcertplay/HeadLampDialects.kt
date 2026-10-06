@@ -23,6 +23,8 @@ internal object HeadLampDialects {
     private const val NEUSOFT = "com.neusoft.action.carmodechange"
     private const val INCALL = "com.incall.action.carmodechange"
     private const val DAY_NIGHT_STATUS = "DayNightStatus"
+    private const val AUTONAVI_BROADCAST = "AUTONAVI_STANDARD_BROADCAST_SEND"
+    private const val AUTONAVI_SEND_RECV = "AUTONAVI_STANDARD_SEND_RECV"
     private const val CAR_MODE = "car_mode"
 
     /** The dialect's night value, or null when the intent carries no usable one. */
@@ -30,6 +32,19 @@ internal object HeadLampDialects {
         val extras = intent.extras ?: return null
         return when (action) {
             DAY_NIGHT_STATUS -> nightFromDayNightStatus(extras)
+            AUTONAVI_BROADCAST, AUTONAVI_SEND_RECV -> {
+                // The lyrics-board bridge relays the car state here (KEY_TYPE 10048,
+                // EXTRA_DAY_NIGHT_MODE 2 = night / 0 = day) - the same source Amap follows.
+                if (extras.getInt("KEY_TYPE", -1) == 10048) {
+                    when (extras.getInt("EXTRA_DAY_NIGHT_MODE", -1)) {
+                        2 -> true
+                        0 -> false
+                        else -> null
+                    }
+                } else {
+                    null
+                }
+            }
             FLY -> {
                 val value = sequenceOf("FLY_KEY_VALUE", "FLY_DAYNIGHT_MODE", "FLY_PM_MODE")
                     .mapNotNull { extras.getString(it) }
@@ -148,7 +163,10 @@ internal object HeadLampDialects {
             }
         }
         val filter = IntentFilter().apply {
-            listOf(FLY, ADAYO, GAEI, NEUSOFT, INCALL, DAY_NIGHT_STATUS).forEach(::addAction)
+            listOf(
+                FLY, ADAYO, GAEI, NEUSOFT, INCALL, DAY_NIGHT_STATUS,
+                AUTONAVI_BROADCAST, AUTONAVI_SEND_RECV,
+            ).forEach(::addAction)
         }
         ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
         app.contentResolver.registerContentObserver(

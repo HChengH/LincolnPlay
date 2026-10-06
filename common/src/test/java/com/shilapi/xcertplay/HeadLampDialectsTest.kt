@@ -30,6 +30,19 @@ class HeadLampDialectsTest {
     }
 
     @Test
+    fun parsesTheLyricsBridgeRelayOutput() {
+        val action = "AUTONAVI_STANDARD_BROADCAST_SEND"
+        assertTrue(
+            HeadLampDialects.nightFrom(action, Intent().putExtra("KEY_TYPE", 10048).putExtra("EXTRA_DAY_NIGHT_MODE", 2))!!
+        )
+        assertFalse(
+            HeadLampDialects.nightFrom(action, Intent().putExtra("KEY_TYPE", 10048).putExtra("EXTRA_DAY_NIGHT_MODE", 0))!!
+        )
+        assertNull(HeadLampDialects.nightFrom(action, Intent().putExtra("KEY_TYPE", 12205)))
+        assertNull(HeadLampDialects.nightFrom(action, Intent()))
+    }
+
+    @Test
     fun parsesTheFlyDialectFromAnyOfItsThreeExtras() {
         assertFalse(HeadLampDialects.nightFrom(fly, Intent(fly).putExtra("FLY_KEY_VALUE", "MODE_DAY"))!!)
         assertTrue(HeadLampDialects.nightFrom(fly, Intent(fly).putExtra("FLY_DAYNIGHT_MODE", "MODE_NIGHT"))!!)
