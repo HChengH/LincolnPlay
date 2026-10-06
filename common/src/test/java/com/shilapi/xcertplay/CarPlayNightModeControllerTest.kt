@@ -260,7 +260,7 @@ class CarPlayNightModeControllerTest {
         val f = Fixture()
         f.light.emit(10f)
         f.clock.advance(4_000)
-        f.controller.configure(CarPlayNightMode.AMBIENT, false, delaySeconds = 0)
+        f.controller.configure(CarPlayNightMode.AMBIENT, false, AmbientLightThreshold(50), delaySeconds = 0)
         f.clock.advance(1_000)
         assertFalse(f.controller.night)
         f.light.emit(10f)
