@@ -1572,9 +1572,9 @@ private class AudioRenderer(
         val end = offset + (length - length % 2)
         val samples = (end - offset) / 2
         if (samples <= 0) return
-        // The ramp spans a bounded window with cubic ease-in-out: zero slope at both ends
-        // keeps the transitions smooth, and a bounded window stops the pace from drifting
-        // with whatever block size the writer dequeues.
+        // The ramp spans a bounded window: geometric interpolation per the audio volume
+        // standard, and a bounded window so the pace never drifts with whatever block
+        // size the writer dequeues.
         val startGain = effectiveGain
         val targetGain = gain
         // Fast attack, slower release - the compressor timing the ear expects from ducking.
@@ -1675,12 +1675,15 @@ private class AudioRenderer(
 }
 
 /**
- * Cubic ease-in-out (smoothstep, 3t^2 - 2t^3) gain interpolation, matching the AudioUnit
- * parameter ramp curve family and Apple's default easeInOut animation curve: zero slope at
- * both ends keeps duck and recovery free of zipper and jerk.
+ * Geometric (exponential) gain interpolation - the audio-domain standard for volume ramps
+ * (Apple's kAudioUnitParameterCurveType_Pow family; Web Audio likewise mandates exponential
+ * ramps for gain). Linear-in-amplitude ramps sound uneven because loudness is logarithmic.
+ * Linear fallback only when either end is silent.
  */
 internal fun interpolatedGain(start: Float, target: Float, progress: Float): Float {
     val t = progress.coerceIn(0f, 1f)
-    val smooth = t * t * (3f - 2f * t)
-    return start + (target - start) * smooth
+    if (start <= 0.0001f || target <= 0.0001f) {
+        return start + (target - start) * t
+    }
+    return (start * Math.pow((target / start).toDouble(), t.toDouble())).toFloat()
 }
