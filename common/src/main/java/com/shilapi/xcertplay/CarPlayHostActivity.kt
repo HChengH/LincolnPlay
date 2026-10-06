@@ -522,9 +522,16 @@ class CarPlayHostActivity : ComponentActivity() {
         // Amap-style headlamp dialect repository: whichever vendor day/night signal this
         // board speaks drives night mode directly; the ambient sensor stays the fallback.
         HeadLampDialects.attach(this) { night, source ->
-            appendLog("Head-unit day/night: source=$source night=$night")
-            lastHeadUnitNightAt = SystemClock.elapsedRealtime()
-            nightModeController.external(night)
+            // Broadcast receivers must never throw: an uncaught exception here kills the
+            // process outright, bypassing every in-app failure surface.
+            runCatching {
+                appendLog("Head-unit day/night: source=$source night=$night")
+                lastHeadUnitNightAt = SystemClock.elapsedRealtime()
+                nightModeController.external(night)
+            }.onFailure { error ->
+                Log.e(TAG, "head-unit day/night signal failed", error)
+                appendLog("Head-unit day/night signal failed: ${error.javaClass.simpleName}")
+            }
         }
         logEnvironmentDiagnostics()
         lastConfiguration = Configuration(resources.configuration)
@@ -4158,24 +4165,29 @@ class CarPlayHostActivity : ComponentActivity() {
             appendLog("THEME_DIAGNOSTIC request source=${source.label} applied=${if (night) "dark" else "light"} sessionActive=false")
             return
         }
-        airPlayCommandExecutor.execute {
-            try {
-                val sent = session.setNightMode(night)
-                // A successful write does not prove the iPhone changed its appearance.
-                appendLog(
-                    "THEME_DIAGNOSTIC send source=${source.label} applied=${if (night) "dark" else "light"} commandWritten=$sent",
-                )
-                Log.i(
-                    TAG,
-                    "AirPlay dark mode=${if (night) "dark" else "light"} eventChannelReady=$sent",
-                )
-            } catch (error: Throwable) {
-                val failureClass = error.javaClass.simpleName.take(64)
-                    .filter { it.isLetterOrDigit() || it == '_' || it == '$' }
-                    .ifEmpty { "unknown" }
-                appendLog("THEME_DIAGNOSTIC send source=${source.label} failureClass=$failureClass")
-                Log.w(TAG, "Could not send AirPlay dark mode update", error)
+        airPlayCommandExecutor.let { executor ->
+            val task = {
+                try {
+                    val sent = session.setNightMode(night)
+                    // A successful write does not prove the iPhone changed its appearance.
+                    appendLog(
+                        "THEME_DIAGNOSTIC send source=${source.label} applied=${if (night) "dark" else "light"} commandWritten=$sent",
+                    )
+                    Log.i(
+                        TAG,
+                        "AirPlay dark mode=${if (night) "dark" else "light"} eventChannelReady=$sent",
+                    )
+                } catch (error: Throwable) {
+                    val failureClass = error.javaClass.simpleName.take(64)
+                        .filter { it.isLetterOrDigit() || it == '_' || it == '$' }
+                        .ifEmpty { "unknown" }
+                    appendLog("THEME_DIAGNOSTIC send source=${source.label} failureClass=$failureClass")
+                    Log.w(TAG, "Could not send AirPlay dark mode update", error)
+                }
             }
+            // The executor dies with the session; a day/night signal arriving after that
+            // must not kill the process from inside a broadcast receiver.
+            runCatching { executor.execute(task) }
         }
     }
 
