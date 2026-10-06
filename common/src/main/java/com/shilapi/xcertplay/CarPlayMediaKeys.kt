@@ -236,6 +236,9 @@ internal object CarPlayMediaKeys {
         )
     }
 
+    /** Vendor wheel keys arrive at the window, not the media session; the host activity routes them here. */
+    fun onHardwareMediaKey(index: Int, source: String) = send(index, source)
+
     private fun send(index: Int, source: String) {
         // While the car's video player is on screen the wheel drives it: a CarPlay play/pause would
         // make the iPhone end the video session.
