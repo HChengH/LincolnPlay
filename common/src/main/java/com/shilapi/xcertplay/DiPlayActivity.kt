@@ -178,6 +178,27 @@ class DiPlayActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Router behaviour for the car launcher's package-level card: an open with a live
+        // CarPlay session goes straight to CarPlay. The forward runs before any content is
+        // built and finishes this activity before its window is added, so the settings UI
+        // never renders; a "page" extra marks an explicit settings request (the session
+        // menu's DiPlay entry) and must never be hijacked. A recreation keeps the page.
+        if (savedInstanceState == null && intent?.getStringExtra("page") == null &&
+            CarPlayBackgroundSession.hasSession()
+        ) {
+            runCatching {
+                startActivity(
+                    Intent(this, CarPlayHostActivity::class.java)
+                        .addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK or
+                                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                                Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                        ),
+                )
+            }
+            finish()
+            return
+        }
         languagePreferenceAtCreate = AppLocale.preference(this)
         com.shilapi.xcertplay.hud.BydNavigationOutputs.onAppOpened(applicationContext)
         WheelKeyService.restoreIfNeeded(this)

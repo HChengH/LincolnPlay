@@ -7,6 +7,10 @@
         <item name="android:statusBarColor">#0C111B</item>
         <item name="android:windowBackground">#0C111B</item>
         <item name="android:windowActionModeOverlay">true</item>
+        <!-- No starting window anywhere: DiPlayActivity forwards a live session straight
+             to CarPlay before its own window exists, and a preview flash in between would
+             betray the router. -->
+        <item name="android:windowDisablePreview">true</item>
     </style>
     <!-- No starting window: the USB-attach launch parks the task behind the launcher
          before its window is added, and without this flag the system would still flash
