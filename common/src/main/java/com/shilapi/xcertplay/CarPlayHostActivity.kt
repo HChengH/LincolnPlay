@@ -4709,6 +4709,11 @@ class CarPlayHostActivity : ComponentActivity() {
                 .getMethod("start", Context::class.java)
                 .invoke(null, applicationContext)
         }
+        runCatching {
+            Class.forName("com.shilapi.xcertplay.diag.DayNightSignalSniffer")
+                .getMethod("start", Context::class.java)
+                .invoke(null, applicationContext)
+        }
     }
 
     private fun setStatus(message: String) {
