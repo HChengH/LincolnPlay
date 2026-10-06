@@ -1582,9 +1582,16 @@ private class AudioRenderer(
         val rampSamples = minOf(samples, maxOf(1, format.sampleRate * rampMillis / 1_000))
         var position = offset
         var index = 0
+        // Ducking stays amplitude-linear - the original car-verified feel: the music steps
+        // aside promptly. Recovery ramps geometrically per the audio volume standard.
+        val ducking = targetGain < startGain
         while (position < end) {
             val progress = (index.toFloat() / rampSamples).coerceAtMost(1f)
-            val g = interpolatedGain(startGain, targetGain, progress)
+            val g = if (ducking) {
+                startGain + (targetGain - startGain) * progress
+            } else {
+                interpolatedGain(startGain, targetGain, progress)
+            }
             val sample = (data[position].toInt() and 0xff) or (data[position + 1].toInt() shl 8)
             val scaled = (sample * g).toInt().coerceIn(-32768, 32767)
             data[position] = scaled.toByte()
