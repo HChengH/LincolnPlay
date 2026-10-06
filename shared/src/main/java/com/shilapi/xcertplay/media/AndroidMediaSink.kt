@@ -1572,9 +1572,9 @@ private class AudioRenderer(
         val end = offset + (length - length % 2)
         val samples = (end - offset) / 2
         if (samples <= 0) return
-        // The ramp spans a bounded window with exponential interpolation: loudness is
-        // logarithmic, so an amplitude-linear ramp sounds fast-then-crawly, and a ramp
-        // implicitly as long as the write chunk made recovery pace drift with block sizes.
+        // The ramp spans a bounded window with cubic ease-in-out: zero slope at both ends
+        // keeps the transitions smooth, and a bounded window stops the pace from drifting
+        // with whatever block size the writer dequeues.
         val startGain = effectiveGain
         val targetGain = gain
         val rampSamples = minOf(samples, maxOf(1, format.sampleRate * GAIN_RAMP_MILLIS / 1_000))
@@ -1671,10 +1671,13 @@ private class AudioRenderer(
     }
 }
 
-/** Exponential (perceptually even) gain interpolation; linear when either end is silent. */
+/**
+ * Cubic ease-in-out (smoothstep, 3t^2 - 2t^3) gain interpolation, matching the AudioUnit
+ * parameter ramp curve family and Apple's default easeInOut animation curve: zero slope at
+ * both ends keeps duck and recovery free of zipper and jerk.
+ */
 internal fun interpolatedGain(start: Float, target: Float, progress: Float): Float {
-    if (start <= 0.0001f || target <= 0.0001f) {
-        return start + (target - start) * progress
-    }
-    return (start * Math.pow((target / start).toDouble(), progress.coerceIn(0f, 1f).toDouble())).toFloat()
+    val t = progress.coerceIn(0f, 1f)
+    val smooth = t * t * (3f - 2f * t)
+    return start + (target - start) * smooth
 }

@@ -3,8 +3,6 @@ package com.shilapi.xcertplay.media
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.abs
-import kotlin.math.log10
 
 class InterpolatedGainTest {
     @Test
@@ -21,22 +19,25 @@ class InterpolatedGainTest {
     }
 
     @Test
-    fun recoveryIsLinearInDecibels() {
-        // Equal progress steps must cover equal loudness (dB) steps - the fix for the
-        // fast-then-crawly amplitude-linear recovery.
-        val startDb = 20 * log10(0.12)
-        val endDb = 20 * log10(1.0)
-        for (step in 1..10) {
-            val progress = step / 10f
-            val expectedDb = startDb + (endDb - startDb) * progress
-            val actualDb = 20 * log10(interpolatedGain(0.12f, 1f, progress).toDouble())
-            assertTrue("progress=$progress", abs(actualDb - expectedDb) < 0.01)
-        }
+    fun followsTheSmoothstepCurve() {
+        // 3t^2 - 2t^3: the quarter point sits below linear, the midpoint lands exactly on
+        // it, and the curve is symmetric.
+        assertEquals(0.15625f, 3 * 0.25f * 0.25f - 2 * 0.25f * 0.25f * 0.25f, 1e-7f)
+        val span = 1f - 0.12f
+        assertEquals(0.12f + span * 0.15625f, interpolatedGain(0.12f, 1f, 0.25f), 1e-6f)
+        assertEquals(0.12f + span * 0.5f, interpolatedGain(0.12f, 1f, 0.5f), 1e-6f)
+        assertEquals(0.12f + span * 0.84375f, interpolatedGain(0.12f, 1f, 0.75f), 1e-6f)
     }
 
     @Test
-    fun silentEndsFallBackToLinear() {
-        assertEquals(0.05f, interpolatedGain(0f, 0.2f, 0.25f), 1e-6f)
-        assertEquals(0.05f, interpolatedGain(0.2f, 0f, 0.75f), 1e-6f)
+    fun startsAndEndsWithZeroSlope() {
+        // The ease-in/out property: neighboring samples at the ends barely differ.
+        val span = 1f - 0.12f
+        val first = interpolatedGain(0.12f, 1f, 0.01f) - 0.12f
+        val linearFirst = span * 0.01f
+        assertTrue(first < linearFirst / 5f)
+        val last = 1f - interpolatedGain(0.12f, 1f, 0.99f)
+        val linearLast = span * 0.01f
+        assertTrue(last < linearLast / 5f)
     }
 }
