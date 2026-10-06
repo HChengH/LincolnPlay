@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -20,34 +21,40 @@ class StartupDiagnosticSnapshotTest {
         AirPlayPersistence.saveAutoStartOnBoot(app, false)
     }
 
-    @Test fun disabledBootIsRecordedWithoutLaunchingOrChangingTheSetting() {
-        var launched = false
+    @Test fun disabledBootIsRecordedWithoutStartingAnythingOrChangingTheSetting() {
+        var started = false
         val context = object : ContextWrapper(app) {
-            override fun startActivity(intent: Intent) { launched = true }
+            override fun startActivity(intent: Intent) { started = true }
+            override fun startForegroundService(service: Intent): ComponentName? { started = true; return null }
         }
         BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
-        assertFalse(launched)
+        assertFalse(started)
         assertFalse(AirPlayPersistence.loadAutoStartOnBoot(app))
         assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchEnabledAtBoot=false launchResult=disabled"))
     }
 
-    @Test fun successfulLaunchMeansAnActivityRequestAndRetainsTheExistingFlags() {
+    @Test fun successfulBootArmsTheWaitingServiceAndNeverLaunchesAnActivity() {
         AirPlayPersistence.saveAutoStartOnBoot(app, true)
-        var launch: Intent? = null
+        var activityLaunch: Intent? = null
+        var serviceStart: Intent? = null
         val context = object : ContextWrapper(app) {
-            override fun startActivity(intent: Intent) { launch = intent }
+            override fun startActivity(intent: Intent) { activityLaunch = intent }
+            override fun startForegroundService(service: Intent): ComponentName? {
+                serviceStart = service
+                return ComponentName(app, DiPlaySessionService::class.java)
+            }
         }
         BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
-        assertEquals(CarPlayHostActivity::class.java.name, launch!!.component!!.className)
-        assertTrue(launch!!.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
-        assertTrue(launch!!.getBooleanExtra("com.shilapi.xcertplay.EXTRA_SILENT_CONNECT", false))
-        assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=startActivity-returned"))
+        assertNull(activityLaunch)
+        assertEquals(DiPlaySessionService::class.java.name, serviceStart!!.component!!.className)
+        assertEquals(DiPlaySessionService.ACTION_BOOT_WAIT, serviceStart!!.action)
+        assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=startForegroundService-returned"))
     }
 
     @Test fun launchFailureRecordsOnlyItsClassAndASecondBootReplacesOldEvidence() {
         AirPlayPersistence.saveAutoStartOnBoot(app, true)
         val context = object : ContextWrapper(app) {
-            override fun startActivity(intent: Intent) { throw SecurityException("Jane's phone token=private-data") }
+            override fun startForegroundService(service: Intent): ComponentName? { throw SecurityException("Jane's phone token=private-data") }
         }
         BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
         val failed = StartupDiagnosticSnapshot.report(app)

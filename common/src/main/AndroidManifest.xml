@@ -57,7 +57,7 @@
             android:launchMode="singleTask"
             android:resizeableActivity="true"
             android:screenOrientation="fullSensor"
-            android:theme="@style/Theme.Xcertplay"
+            android:theme="@style/Theme.Xcertplay.CarPlayHost"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
@@ -75,6 +75,7 @@
             android:targetActivity="com.shilapi.xcertplay.CarPlayHostActivity"
             android:label="@string/carplay_launcher_label"
             android:icon="@drawable/ic_carplay"
+            android:theme="@style/Theme.Xcertplay.CarPlayHost"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

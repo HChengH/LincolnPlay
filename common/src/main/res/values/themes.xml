@@ -8,6 +8,12 @@
         <item name="android:windowBackground">#0C111B</item>
         <item name="android:windowActionModeOverlay">true</item>
     </style>
+    <!-- No starting window: the USB-attach launch parks the task behind the launcher
+         before its window is added, and without this flag the system would still flash
+         the launch preview over whatever the driver is looking at. -->
+    <style name="Theme.Xcertplay.CarPlayHost" parent="Theme.Xcertplay">
+        <item name="android:windowDisablePreview">true</item>
+    </style>
     <style name="Theme.AdbCluster" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>

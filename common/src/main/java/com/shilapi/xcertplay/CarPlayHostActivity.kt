@@ -615,10 +615,19 @@ class CarPlayHostActivity : ComponentActivity() {
             "Host started; MFI target=${mfiTargetLabel(mfiTarget)}; " +
                 "transport=${if (wirelessEnabled) "wireless" else "wired"}",
         )
-        // Boot auto-start and USB attach both arrive silently: connect behind the launcher
-        // and surface only when the AirPlay session is active. The user's launcher,
-        // radio or navigation stays on top and fully interactive until then.
-        silentConnect = intent?.getBooleanExtra(EXTRA_SILENT_CONNECT, false) ?: false
+        // The USB attach cold launch goes silent whenever the native CarPlay toggle is
+        // on: the system launched us from the cable event, nothing was tapped. Connect
+        // behind the launcher and surface only when the AirPlay session is active — the
+        // user's launcher, radio or navigation stays on top and fully interactive until
+        // then. The theme's windowDisablePreview plus parking the task here, before the
+        // window is ever added, is what makes the launch invisible. (Boot itself starts
+        // only the waiting service; it never launches an activity.) Permission dialogs
+        // are intentionally NOT suppressed: a dialog that appears here means the user
+        // never granted it, and letting it ask in the open beats failing quietly.
+        val launchIntent = intent
+        silentConnect = (launchIntent?.getBooleanExtra(EXTRA_SILENT_CONNECT, false) ?: false) ||
+            (launchIntent != null && isIphoneUsbAttachment(launchIntent) &&
+                AirPlayPersistence.loadAutoStartOnBoot(this))
         if (silentConnect && !isFinishing) {
             moveTaskToBack(true)
             appendLog("Silent connect: staying behind the launcher until CarPlay is ready")
@@ -842,6 +851,15 @@ class CarPlayHostActivity : ComponentActivity() {
         if (intent.action != UsbManager.ACTION_USB_DEVICE_ATTACHED) return false
         val device = androidx.core.content.IntentCompat.getParcelableExtra(intent, UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
         return device?.vendorId == IphoneUsbMatcher.APPLE_VENDOR_ID
+    }
+
+    /** Brings the parked CarPlay task back to the front without recreating the host. */
+    private fun surfaceFromBackground() {
+        if (isFinishing) return
+        runCatching {
+            startActivity(Intent(this, CarPlayHostActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+        }
     }
 
     override fun onStart() {
@@ -3884,10 +3902,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     // The silent-connect host surfaces now: CarPlay is ready to show.
                     if (silentConnect) {
                         silentConnect = false
-                        runCatching {
-                            startActivity(Intent(this@CarPlayHostActivity, CarPlayHostActivity::class.java)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
-                        }
+                        surfaceFromBackground()
                         appendLog("Silent connect: surfacing CarPlay")
                     }
                 }
