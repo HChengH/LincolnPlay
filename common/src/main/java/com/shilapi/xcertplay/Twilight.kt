@@ -5,8 +5,8 @@ import java.util.TimeZone
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.asin
+import kotlin.math.ceil
 import kotlin.math.cos
-import kotlin.math.floor
 import kotlin.math.sin
 
 /**
@@ -34,14 +34,14 @@ internal object Twilight {
             return fallbackIsNight(nowMillis, zone)
         }
         val julianNow = nowMillis / DAY_MILLIS + UNIX_TO_JULIAN
-        val days = floor(julianNow - 2_451_545.0 + 0.0008 - longitude / 360.0)
-        val meanAnomaly = mod360(357.5291 + 0.98560028 * days)
+        val days = ceil(julianNow - 2_451_545.0 + 0.0008 - longitude / 360.0)
+        val starDate = days - longitude / 360.0
+        val meanAnomaly = mod360(357.5291 + 0.98560028 * starDate)
         val center = 1.9148 * sinDegrees(meanAnomaly) +
             0.02 * sinDegrees(2 * meanAnomaly) +
             0.0003 * sinDegrees(3 * meanAnomaly)
         val eclipticLongitude = mod360(meanAnomaly + center + 180.0 + 102.9372)
-        val transitJulian = 2_451_545.0 + days + 0.0008 - longitude / 360.0 +
-            0.0053 * sinDegrees(meanAnomaly) -
+        val transitJulian = 2_451_545.0 + starDate + 0.0053 * sinDegrees(meanAnomaly) -
             0.0069 * sinDegrees(2 * eclipticLongitude)
         val declination = asin(sinDegrees(eclipticLongitude) * sinDegrees(23.44))
         val cosHourAngle =
