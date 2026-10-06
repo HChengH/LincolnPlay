@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import com.shilapi.xcertplay.host.R
 
 /** Keeps an explicitly started connection alive when another car app is in the foreground. */
@@ -45,6 +46,14 @@ class DiPlaySessionService : Service() {
             }
             startForeground(1, notification, types)
         } else startForeground(1, notification)
+        if (intent?.action == ACTION_SURFACE_HOST) {
+            // The parked host asks its foreground service to bring it up: ROMs that drop
+            // background activity starts usually still honour the foreground-service context.
+            runCatching {
+                startActivity(Intent(this, CarPlayHostActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.onFailure { Log.w(TAG, "could not surface CarPlay from the service", it) }
+        }
         return START_NOT_STICKY
     }
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -55,6 +64,9 @@ class DiPlaySessionService : Service() {
     }
     companion object {
         const val ACTION_STOP = "com.shihab.diplay.DISCONNECT"
+        /** Ask the foreground service to bring the parked CarPlay host to the front. */
+        const val ACTION_SURFACE_HOST = "com.shilapi.xcertplay.SURFACE_HOST"
+        private const val TAG = "xcertplay-service"
         private const val CHANNEL = "diplay_connection"
     }
 }

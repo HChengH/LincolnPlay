@@ -866,10 +866,23 @@ class CarPlayHostActivity : ComponentActivity() {
     /** Brings the parked CarPlay task back to the front without recreating the host. */
     private fun surfaceFromBackground() {
         if (isFinishing) return
-        runCatching {
+        // Two shots at the front: OEM head-unit ROMs commonly drop activity starts that
+        // come from a backgrounded activity (verified on the SYNC+ board: the settings
+        // page stayed up while the session streamed audio behind it). The retry from the
+        // running foreground service's context is the path such ROMs still honour. Both
+        // resolve to the same singleTask instance, so a stock ROM just sees a no-op repeat.
+        val direct = runCatching {
             startActivity(Intent(this, CarPlayHostActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
         }
+        appendLog(
+            "Silent connect surfacing direct=" + direct.isSuccess +
+                (direct.exceptionOrNull()?.let { " err=${it.javaClass.simpleName}" } ?: ""),
+        )
+        runCatching {
+            startForegroundService(Intent(this, DiPlaySessionService::class.java)
+                .setAction(DiPlaySessionService.ACTION_SURFACE_HOST))
+        }.onFailure { appendLog("Surface service dispatch failed: ${it.javaClass.simpleName}") }
     }
 
     override fun onStart() {
