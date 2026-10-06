@@ -333,11 +333,15 @@ class AndroidMediaSink(
     override fun onAudioStopped(id: AudioStreamId) {
         val renderer = audioRenderers.remove(id)
         val wasOverlay = renderer != null && mapsToOverlayChannel(renderer.format)
-        renderer?.close()
         if (wasOverlay) {
-            audioFocusCoordinator.overlay(false)
-            applyOverlayGain(false)
+            // Hold the duck until the buffered prompt tail has actually sounded, so the
+            // arrival announcement neither gets clipped nor swelled over.
+            renderer?.onDrained = {
+                audioFocusCoordinator.overlay(false)
+                applyOverlayGain(false)
+            }
         }
+        renderer?.close()
         updateMediaAudio(id, false)
     }
 
@@ -951,9 +955,18 @@ private class AudioRenderer(
         }
     }
 
+    /** Invoked on the renderer thread once the closing track has finished sounding. */
+    @Volatile var onDrained: (() -> Unit)? = null
+
+    /**
+     * Ends the stream after everything already received has sounded. The prompt track holds
+     * up to its buffer depth of written-but-unplayed PCM; releasing at the last packet cut
+     * the tail of the arrival announcement. The poll loop wakes on its own, so no interrupt
+     * - an interrupt would abort a blocking write mid-packet.
+     */
     override fun close() {
+        drainOnClose = true
         running = false
-        thread.interrupt()
     }
 
     private fun run() {
@@ -995,7 +1008,21 @@ private class AudioRenderer(
             throw error
         } finally {
             runCatching { logStatsIfDue(force = true) }
+            if (drainOnClose) drainTrack()
             release()
+            runCatching { onDrained?.invoke() }
+        }
+    }
+
+    /** Bounded wait for the track to play what was written into it. */
+    private fun drainTrack() {
+        val audioTrack = track ?: return
+        if (totalWrittenFrames <= 0L) return
+        val deadline = System.nanoTime() + DRAIN_TIMEOUT_NS
+        while (System.nanoTime() < deadline) {
+            val played = audioTrack.playbackHeadPosition.toLong().and(0xffff_ffffL)
+            if (played >= totalWrittenFrames) return
+            Thread.sleep(20)
         }
     }
 
@@ -1436,7 +1463,7 @@ private class AudioRenderer(
         }
         if (gain < 1f || effectiveGain < 1f) applyGain(data, offset, length)
         var written = 0
-        while (written < length && running) {
+            while (written < length && (running || drainOnClose)) {
             val writeLength = if (playbackStarted) {
                 length - written
             } else {
@@ -1561,6 +1588,7 @@ private class AudioRenderer(
      */
     @Volatile private var gain = 1f
     private var effectiveGain = 1f // writer-thread owned; ramps toward [gain]
+    @Volatile private var drainOnClose = false
 
     fun setGain(value: Float) {
         gain = value.coerceIn(0f, 1f)
@@ -1582,16 +1610,9 @@ private class AudioRenderer(
         val rampSamples = minOf(samples, maxOf(1, format.sampleRate * rampMillis / 1_000))
         var position = offset
         var index = 0
-        // Ducking stays amplitude-linear - the original car-verified feel: the music steps
-        // aside promptly. Recovery ramps geometrically per the audio volume standard.
-        val ducking = targetGain < startGain
         while (position < end) {
             val progress = (index.toFloat() / rampSamples).coerceAtMost(1f)
-            val g = if (ducking) {
-                startGain + (targetGain - startGain) * progress
-            } else {
-                interpolatedGain(startGain, targetGain, progress)
-            }
+            val g = interpolatedGain(startGain, targetGain, progress)
             val sample = (data[position].toInt() and 0xff) or (data[position + 1].toInt() shl 8)
             val scaled = (sample * g).toInt().coerceIn(-32768, 32767)
             data[position] = scaled.toByte()
@@ -1663,6 +1684,7 @@ private class AudioRenderer(
 
     private companion object {
         const val TAG = "xcertplay-usb"
+        const val DRAIN_TIMEOUT_NS = 2_000_000_000L
         const val DUCK_RAMP_MILLIS = 120
         const val RECOVER_RAMP_MILLIS = 220
         const val AAC_OBJECT_TYPE_LC = 2
