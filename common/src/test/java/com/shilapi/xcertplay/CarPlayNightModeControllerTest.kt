@@ -55,7 +55,7 @@ class CarPlayNightModeControllerTest {
         f.clock.advance(1)
         assertTrue(f.controller.night)
         assertEquals(listOf(true), f.output)
-        f.light.emit(101f)
+        f.light.emit(200f)
         f.clock.advance(4_999)
         assertTrue(f.controller.night)
         f.clock.advance(1)
@@ -73,18 +73,23 @@ class CarPlayNightModeControllerTest {
         assertEquals(listOf(true), f.output)
     }
 
-    @Test fun equalitySelectsDayAndBothSidesUseTheDelay() {
+    @Test fun headlampBandHoldsTheCurrentStateBetweenThresholds() {
+        // Threshold 50: night below 50, day above 125 (2.5x), the band in between holds.
         val f = Fixture(true)
-        f.light.emit(50f)
-        f.clock.advance(4_999)
+        f.light.emit(60f)
+        f.clock.advance(10_000)
         assertTrue(f.controller.night)
-        f.clock.advance(1)
-        assertFalse(f.controller.night)
         f.light.emit(49f)
         f.clock.advance(4_999)
-        assertFalse(f.controller.night)
-        f.clock.advance(1)
         assertTrue(f.controller.night)
+        f.light.emit(200f)
+        f.clock.advance(4_999)
+        assertTrue(f.controller.night)
+        f.clock.advance(1)
+        assertFalse(f.controller.night)
+        f.light.emit(100f)
+        f.clock.advance(10_000)
+        assertFalse(f.controller.night)
     }
 
     @Test fun interruptedOrInvalidReadingRequiresANewFullInterval() {
@@ -261,7 +266,7 @@ class CarPlayNightModeControllerTest {
         f.light.emit(10f)
         assertTrue(f.controller.night)
         assertTrue(f.clock.tasks.isEmpty())
-        f.light.emit(50f)
+        f.light.emit(200f)
         assertFalse(f.controller.night)
     }
 
