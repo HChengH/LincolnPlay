@@ -518,6 +518,12 @@ class CarPlayHostActivity : ComponentActivity() {
         nightModeOrNull(resources.configuration.uiMode)?.let { lastObservedUiNight = it }
         DiagnosticSnifferHook.line = { appendLog(it) }
         startDebugSniffer()
+        // Amap-style headlamp dialect repository: whichever vendor day/night signal this
+        // board speaks drives night mode directly; the ambient sensor stays the fallback.
+        HeadLampDialects.attach(this) { night, source ->
+            appendLog("Head-unit day/night: source=$source night=$night")
+            nightModeController.external(night)
+        }
         logEnvironmentDiagnostics()
         lastConfiguration = Configuration(resources.configuration)
         darkMode = savedInstanceState?.getBoolean("carplay_night_active")
@@ -1278,6 +1284,7 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onDestroy() {
         resetSidePanel()
         nightModeController.pause()
+        HeadLampDialects.detach()
         pictureBinding?.close()
         pictureBinding = null
         mainHandler.removeCallbacks(refreshTurnOverlay)

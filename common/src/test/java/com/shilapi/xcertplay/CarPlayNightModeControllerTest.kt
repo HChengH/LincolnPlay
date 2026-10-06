@@ -265,4 +265,39 @@ class CarPlayNightModeControllerTest {
         assertFalse(f.controller.night)
     }
 
+    @Test fun externalAppliesAtOnceAndHoldsTheSensorBack() {
+        val f = Fixture()
+        f.controller.external(true)
+        assertTrue(f.controller.night)
+        assertEquals(listOf(true), f.output)
+        // A bright reading inside the hold cannot flip the vendor override back.
+        f.light.emit(1_000f)
+        f.clock.advance(10_000)
+        assertTrue(f.controller.night)
+        // Once the hold expires, the sensor regains control.
+        f.clock.advance(30_000)
+        f.light.emit(1_000f)
+        f.clock.advance(5_000)
+        assertFalse(f.controller.night)
+    }
+
+    @Test fun externalIsIgnoredForForcedModes() {
+        val f = Fixture()
+        f.controller.configure(CarPlayNightMode.DAY, false)
+        f.controller.external(true)
+        assertFalse(f.controller.night)
+        f.controller.configure(CarPlayNightMode.NIGHT, true)
+        f.controller.external(false)
+        assertTrue(f.controller.night)
+    }
+
+    @Test fun externalWorksInSystemMode() {
+        val f = Fixture()
+        f.controller.configure(CarPlayNightMode.SYSTEM, false)
+        f.controller.external(true)
+        assertTrue(f.controller.night)
+        f.controller.external(false)
+        assertFalse(f.controller.night)
+    }
+
 }
