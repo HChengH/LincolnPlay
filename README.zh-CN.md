@@ -3,6 +3,8 @@
 **为 2020 款林肯飞行家（中规 SYNC+ 破解车机）打造的 Wired CarPlay 接收器，亦适用于类似的 Android 8 车机。** 基于 [DiPlay](https://github.com/shihabal3amri/DiPlay) 移植：同一套接收器，重定了传输、音频与仪表集成。
 
 > 在一辆车上开发并实车验证：2020 飞行家，NXP MEK-MX8Q 主板，Android 8.1（API 27，userdebug）。其他 SYNC+/Freescale 车机可能可用；比亚迪专属代码保留在树中但会自行关闭。与福特、苹果无关。
+>
+> 请阅读 [免责声明](DISCLAIMER.md)——仅供技术交流与学习，按现状提供，不承担任何责任。
 
 ## 实车已验证
 

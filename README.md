@@ -3,6 +3,8 @@
 **Wired CarPlay for the 2020 Lincoln Aviator (Chinese SYNC+ cracked head unit) — and similar Android 8 dashboards.** A port of [DiPlay](https://github.com/shihabal3amri/DiPlay) away from its BYD home: same receiver, retargeted transport, audio and cluster integration.
 
 > Developed and verified on one car: a 2020 Aviator with an NXP MEK-MX8Q board running Android 8.1 (API 27, userdebug). Other SYNC+/Freescale units may work; BYD-specific paths remain in the tree but gate themselves off. Not affiliated with Ford or Apple.
+>
+> See [DISCLAIMER.md](DISCLAIMER.md) — for technical exchange and learning only, provided as-is, no liability.
 
 ## What is verified on the car
 
