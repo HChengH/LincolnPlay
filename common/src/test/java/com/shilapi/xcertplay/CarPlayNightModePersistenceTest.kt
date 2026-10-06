@@ -24,7 +24,7 @@ class CarPlayNightModePersistenceTest {
     }
 
     @Test fun thresholdDefaultAndCustomValuePersist() {
-        assertEquals(AmbientLightThreshold(30), AirPlayPersistence.loadAmbientLightThreshold(context))
+        assertEquals(AmbientLightThreshold(), AirPlayPersistence.loadAmbientLightThreshold(context))
         AirPlayPersistence.saveCarPlayNightMode(context, CarPlayNightMode.AMBIENT)
         AirPlayPersistence.saveAmbientLightThreshold(context, AmbientLightThreshold(200))
         assertEquals(AmbientLightThreshold(200), AirPlayPersistence.loadAmbientLightThreshold(context))

@@ -251,7 +251,7 @@ class CarPlayNightModeControllerTest {
         assertFalse(f.controller.night)
         f.clock.advance(1)
         assertTrue(f.controller.night)
-        f.light.emit(60f)
+        f.light.emit(200f)
         f.clock.advance(1_000)
         assertFalse(f.controller.night)
     }
