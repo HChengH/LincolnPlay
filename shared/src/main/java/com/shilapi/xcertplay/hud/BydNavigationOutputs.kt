@@ -26,6 +26,7 @@ object BydNavigationOutputs {
         emptyListHideNs = 8_000_000_000L,
         keepAcrossNoRoute = true,
     )
+    private val amap = NavigationOutputWorker("diplay-amap-output", AmapAutoNavigationBridge::clear)
     private val standalone = NavigationOutputWorker("diplay-standalone-output", BydStandaloneNavigationBridge::clear)
     private val hud = NavigationOutputWorker("diplay-hud-output", BydHudBridge::clear)
     private val cluster = NavigationOutputWorker("diplay-cluster-output", BydClusterBridge::clear)
@@ -59,15 +60,39 @@ object BydNavigationOutputs {
     fun start(context: Context) {
         val app = context.applicationContext
         useStandalone = BydStandaloneHudOutput.available(app)
+        val bydClusterAdapter = runCatching { app.packageManager.getPackageInfo("com.byd.amapservice", 0) }.isSuccess
         if (useStandalone) standalone.start { BydStandaloneNavigationBridge.initialize(app) }
         else {
             hud.start { BydHudBridge.initialize(app) }
             cluster.start { BydClusterBridge.initialize(app) }
         }
+        // The standard AmapAuto output targets aftermarket decoders; skip it on units with the
+        // BYD adapter, whose bridge already feeds the same receivers with BYD-specific framing.
+        if (!useStandalone && !bydClusterAdapter) amap.start { AmapAutoNavigationBridge.initialize(app) }
         BydClusterMapPause.initialize(app)
         BydClusterSong.attach(app)
         BydCarPlayCall.attach(app)
     }
+
+    /**
+     * Bounded raw dumps for car-side protocol calibration: maneuver updates (0x5202) always,
+     * route updates (0x5201) at most every 5 s. The TLV layout was reverse-engineered on older
+     * iOS; a constant wrong arrow with correct distance means this iOS changed it.
+     */
+    private fun dumpRouteFrame(frame: Iap2Frame) {
+        val maneuver = frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE
+        val now = System.currentTimeMillis()
+        if (!maneuver) {
+            if (now - lastRouteUpdateDumpAt < 5_000) return
+            lastRouteUpdateDumpAt = now
+        }
+        val hex = frame.payload.joinToString("") { "%02x".format(it) }
+        com.shilapi.xcertplay.DiagnosticSnifferHook.post(
+            "Amap raw ${if (maneuver) "0x5202" else "0x5201"} ${frame.payload.size}B $hex",
+        )
+    }
+
+    private var lastRouteUpdateDumpAt = 0L
 
     internal fun onFrame(frame: Iap2Frame) {
         if (frame.messageId == ClusterSongState.NOW_PLAYING_UPDATE) {
@@ -82,11 +107,13 @@ object BydNavigationOutputs {
             frame.messageId != BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE) return
         val owned = frame // Iap2Frame is immutable and defensively copies its payload.
         updateOverlay(owned)
+        dumpRouteFrame(frame)
         if (useStandalone) standalone.submit { BydStandaloneNavigationBridge.onFrame(owned) }
         else {
             hud.submit { BydHudBridge.onFrame(owned) }
             cluster.submit { BydClusterBridge.onFrame(owned) }
         }
+        amap.submit { AmapAutoNavigationBridge.onFrame(owned) }
     }
 
     /** Live next-turn state for the dashboard overlay. Called from the iAP2 thread. */
@@ -140,7 +167,7 @@ object BydNavigationOutputs {
 
     /** Best effort while alive; Android does not guarantee callbacks before force-stop. */
     fun endNow(preserveTurnOverlay: Boolean = false) {
-        standalone.clear(); hud.clear(); cluster.clear(); BydClusterSong.end(); BydCarPlayCall.end()
+        standalone.clear(); hud.clear(); cluster.clear(); amap.clear(); BydClusterSong.end(); BydCarPlayCall.end()
         // Only a wireless session replacement retains the card. Explicit controller close
         // and wired disconnect still clear it immediately.
         if (!preserveTurnOverlay) {
