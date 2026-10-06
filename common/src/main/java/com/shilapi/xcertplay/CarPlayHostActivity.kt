@@ -1375,7 +1375,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = LinearLayout.VERTICAL.CENTER
+            gravity = Gravity.CENTER
         }
         val icon = ImageView(this).apply {
             setImageResource(R.drawable.ic_carplay)
@@ -1386,21 +1386,21 @@ class CarPlayHostActivity : ComponentActivity() {
         val title = TextView(this).apply {
             text = getString(R.string.diplay)
             setTextColor(CONNECTION_SCREEN_DAY_TEXT)
-            gravity = TextView.CENTER
+            gravity = Gravity.CENTER
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
         connectionTitleView = title
         panel.addView(title)
         val stage = TextView(this).apply {
             text = getString(R.string.getting_carplay_ready)
-            gravity = TextView.CENTER
+            gravity = Gravity.CENTER
             setTextColor(CONNECTION_SCREEN_DAY_TEXT)
         }
         panel.addView(stage)
         val instructions = TextView(this).apply {
             text = if (wirelessEnabled) getString(R.string.keep_your_iphone_nearby_with_bluetooth_and_wi_fi_on_allow)
                 else getString(R.string.use_a_usb_data_cable_and_unlock_your_iphone_allow_trust_an)
-            gravity = TextView.CENTER
+            gravity = Gravity.CENTER
             setTextColor(CONNECTION_SCREEN_DAY_SECONDARY)
         }
         connectionInstructionsView = instructions
