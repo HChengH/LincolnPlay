@@ -21,7 +21,7 @@ class BootReceiver : BroadcastReceiver() {
 
         val launch = Intent(context, CarPlayHostActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra(CarPlayHostActivity.EXTRA_SILENT_CONNECT, true)
+            putExtra("com.shilapi.xcertplay.EXTRA_SILENT_CONNECT", true)
         }
         try {
             context.startActivity(launch)

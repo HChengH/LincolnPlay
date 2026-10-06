@@ -117,16 +117,14 @@ import kotlin.math.roundToInt
  *
  * Apple devices are discovered by vendor ID; CH341 uses the configured VID/PID below.
  */
+/** Sent by BootReceiver and USB attach to connect without showing any UI until ready. */
+private const val EXTRA_SILENT_CONNECT = "com.shilapi.xcertplay.EXTRA_SILENT_CONNECT"
+
 class CarPlayHostActivity : ComponentActivity() {
     private data class SettingsBaseline(
         val safeAreaRects: MutableMap<DisplaySize, SafeAreaRect?>,
         val customIconBytes: ByteArray?,
     )
-
-    /** Sent by BootReceiver and USB attach to connect without showing any UI until ready. */
-    companion object {
-        const val EXTRA_SILENT_CONNECT = "com.shilapi.xcertplay.EXTRA_SILENT_CONNECT"
-    }
 
     private var connectionPanel: View? = null
     private var connectionIconView: ImageView? = null
