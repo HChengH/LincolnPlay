@@ -121,6 +121,9 @@ class CarPlayHostActivity : ComponentActivity() {
     )
 
     private var connectionPanel: View? = null
+    private var connectionIconView: ImageView? = null
+    private var connectionTitleView: TextView? = null
+    private var connectionInstructionsView: TextView? = null
     private var wifiRecoveryButton: View? = null
     private var reconnectAttempts = 0
     private val startupRetryBudget = WirelessStartupRetryBudget()
@@ -416,6 +419,7 @@ class CarPlayHostActivity : ComponentActivity() {
         ) { night ->
             darkMode = night
             applyClusterTurnOverlay()
+            applyConnectionScreenTheme()
             appendLog("CarPlay switched to ${if (night) "night" else "day"} mode")
             logThemeState(nightModeDiagnosticSource, resources.configuration)
             syncAirPlayDarkMode(nightModeDiagnosticSource)
@@ -1366,37 +1370,40 @@ class CarPlayHostActivity : ComponentActivity() {
                 )
             }
         }.apply {
-            setBackgroundColor(Color.rgb(233, 238, 246))
+            setBackgroundColor(CONNECTION_SCREEN_DAY_BACKGROUND)
             isClickable = true
         }
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
+            gravity = LinearLayout.VERTICAL.CENTER
         }
         val icon = ImageView(this).apply {
             setImageResource(R.drawable.ic_carplay)
             contentDescription = getString(R.string.carplay)
         }
+        connectionIconView = icon
         panel.addView(icon, LinearLayout.LayoutParams(dp(88), dp(88)))
         val title = TextView(this).apply {
             text = getString(R.string.diplay)
-            setTextColor(Color.rgb(28, 28, 30))
-            gravity = Gravity.CENTER
+            setTextColor(CONNECTION_SCREEN_DAY_TEXT)
+            gravity = TextView.CENTER
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         }
+        connectionTitleView = title
         panel.addView(title)
         val stage = TextView(this).apply {
             text = getString(R.string.getting_carplay_ready)
-            gravity = Gravity.CENTER
-            setTextColor(Color.rgb(28, 28, 30))
+            gravity = TextView.CENTER
+            setTextColor(CONNECTION_SCREEN_DAY_TEXT)
         }
         panel.addView(stage)
         val instructions = TextView(this).apply {
             text = if (wirelessEnabled) getString(R.string.keep_your_iphone_nearby_with_bluetooth_and_wi_fi_on_allow)
                 else getString(R.string.use_a_usb_data_cable_and_unlock_your_iphone_allow_trust_an)
-            gravity = Gravity.CENTER
-            setTextColor(Color.rgb(90, 100, 116))
+            gravity = TextView.CENTER
+            setTextColor(CONNECTION_SCREEN_DAY_SECONDARY)
         }
+        connectionInstructionsView = instructions
         panel.addView(instructions)
         val recovery = Button(this).apply {
             text = getString(R.string.reset_carplay_wi_fi)
@@ -1520,8 +1527,25 @@ class CarPlayHostActivity : ComponentActivity() {
         settingsGestureHint = gestureHint
         stageStatusView = stage
         connectionPanel = viewport
+        applyConnectionScreenTheme()
         updateDebugOverlays()
         return root
+    }
+
+    /** The waiting screen follows the same day/night signal as CarPlay itself. */
+    private fun applyConnectionScreenTheme() {
+        val panel = connectionPanel ?: return
+        val night = darkMode
+        panel.setBackgroundColor(if (night) CONNECTION_SCREEN_NIGHT_BACKGROUND else CONNECTION_SCREEN_DAY_BACKGROUND)
+        connectionIconView?.setColorFilter(
+            if (night) CONNECTION_SCREEN_NIGHT_TEXT else 0,
+            if (night) android.graphics.PorterDuff.Mode.SRC_IN else android.graphics.PorterDuff.Mode.CLEAR,
+        )
+        connectionTitleView?.setTextColor(if (night) CONNECTION_SCREEN_NIGHT_TEXT else CONNECTION_SCREEN_DAY_TEXT)
+        stageStatusView?.setTextColor(if (night) CONNECTION_SCREEN_NIGHT_TEXT else CONNECTION_SCREEN_DAY_TEXT)
+        connectionInstructionsView?.setTextColor(
+            if (night) CONNECTION_SCREEN_NIGHT_SECONDARY else CONNECTION_SCREEN_DAY_SECONDARY,
+        )
     }
 
     // DiPlay's side panel: placed over the part of the stream CarPlay leaves black (placeSidePanel), so it
@@ -4948,6 +4972,12 @@ class CarPlayHostActivity : ComponentActivity() {
         const val CONFIGURATION_POLL_INTERVAL_MILLIS = 2_000L
         const val DAY_NIGHT_BASELINE_INTERVAL_MILLIS = 10 * 60_000L
         const val RECONNECT_DELAY_MILLIS = 2_000L
+        const val CONNECTION_SCREEN_DAY_BACKGROUND = 0xFFE9EEF6.toInt()
+        const val CONNECTION_SCREEN_DAY_TEXT = 0xFF1C1C1E.toInt()
+        const val CONNECTION_SCREEN_DAY_SECONDARY = 0xFF5A6474.toInt()
+        const val CONNECTION_SCREEN_NIGHT_BACKGROUND = 0xFF0C111B.toInt()
+        const val CONNECTION_SCREEN_NIGHT_TEXT = 0xFFD6E2F0.toInt()
+        const val CONNECTION_SCREEN_NIGHT_SECONDARY = 0xFF788496.toInt()
         const val IAP_TUNNEL_RECONNECT_DELAY_MILLIS = 15_000L
         const val CONTROLLER_CLOSE_TIMEOUT_MILLIS = 4_000L
         const val AUDIO_CAPTURE_MARKER = "audio-capture.enabled"
