@@ -8,12 +8,14 @@ import android.util.Log
 /**
  * Arms the CarPlay host after boot when the user has enabled the startup option.
  *
- * Boot only starts the foreground service: no activity is created, so nothing can
- * appear over the car's own UI. The service keeps the process warm (and says it is
- * waiting for the iPhone). When the cable arrives, the system cold-launches
- * CarPlayHostActivity through its USB filter; that launch connects silently behind
- * the launcher and surfaces only when CarPlay is ready. The DiPlay settings screen
- * is never opened by the boot path.
+ * Two pieces, both invisible:
+ * - the foreground service pins the process with a "waiting for iPhone" notification;
+ * - the host activity launches silently (parked behind the launcher before its
+ *   window is added, no starting window) so permissions, VPN consent, the bootstrap
+ *   and the USB controller are all ready the moment the cable arrives.
+ *
+ * If the activity start fails, nothing is lost: the USB filter cold-launches it on
+ * plug, silent as well. The DiPlay settings screen is never opened by the boot path.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -30,6 +32,16 @@ class BootReceiver : BroadcastReceiver() {
         } catch (error: RuntimeException) {
             StartupDiagnosticSnapshot.launchResult(context, error)
             Log.w(TAG, "Boot auto-start could not start DiPlaySessionService", error)
+        }
+
+        val launch = Intent(context, CarPlayHostActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra("com.shilapi.xcertplay.EXTRA_SILENT_CONNECT", true)
+        }
+        try {
+            context.startActivity(launch)
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "Boot auto-start could not launch CarPlayHostActivity", error)
         }
     }
 

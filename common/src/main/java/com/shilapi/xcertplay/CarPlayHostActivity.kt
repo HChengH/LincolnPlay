@@ -620,10 +620,11 @@ class CarPlayHostActivity : ComponentActivity() {
         // behind the launcher and surface only when the AirPlay session is active — the
         // user's launcher, radio or navigation stays on top and fully interactive until
         // then. The theme's windowDisablePreview plus parking the task here, before the
-        // window is ever added, is what makes the launch invisible. (Boot itself starts
-        // only the waiting service; it never launches an activity.) Permission dialogs
-        // are intentionally NOT suppressed: a dialog that appears here means the user
-        // never granted it, and letting it ask in the open beats failing quietly.
+        // window is ever added, is what makes the launch invisible. (Boot launches us
+        // this way too, after arming the waiting service, so permissions, VPN consent
+        // and the USB controller are all ready before the cable arrives.) Permission
+        // dialogs are intentionally NOT suppressed: a dialog that appears here means
+        // the user never granted it, and letting it ask in the open beats failing quietly.
         val launchIntent = intent
         silentConnect = (launchIntent?.getBooleanExtra(EXTRA_SILENT_CONNECT, false) ?: false) ||
             (launchIntent != null && isIphoneUsbAttachment(launchIntent) &&
@@ -832,6 +833,15 @@ class CarPlayHostActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         if (isIphoneUsbAttachment(intent)) {
+            // The USB attach intent raises this task even when we parked it at boot.
+            // Park it again before the window draws (the same zero-flash contract as
+            // the cold launch) and surface when the session is actually active. Skipped
+            // while visible: a re-enumeration while CarPlay is on screen must not hide it.
+            if (!isActivityStarted && AirPlayPersistence.loadAutoStartOnBoot(this)) {
+                silentConnect = true
+                moveTaskToBack(true)
+                appendLog("Silent connect: staying behind the launcher while the cable session comes up")
+            }
             if (wirelessEnabled) {
                 if (menuOpen) cancelSettingsEdits()
                 AirPlayPersistence.saveWirelessEnabled(this, false)

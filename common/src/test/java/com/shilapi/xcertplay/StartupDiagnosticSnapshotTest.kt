@@ -33,7 +33,7 @@ class StartupDiagnosticSnapshotTest {
         assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchEnabledAtBoot=false launchResult=disabled"))
     }
 
-    @Test fun successfulBootArmsTheWaitingServiceAndNeverLaunchesAnActivity() {
+    @Test fun successfulBootArmsTheWaitingServiceAndSilentlyLaunchesTheHost() {
         AirPlayPersistence.saveAutoStartOnBoot(app, true)
         var activityLaunch: Intent? = null
         var serviceStart: Intent? = null
@@ -45,9 +45,11 @@ class StartupDiagnosticSnapshotTest {
             }
         }
         BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
-        assertNull(activityLaunch)
         assertEquals(DiPlaySessionService::class.java.name, serviceStart!!.component!!.className)
         assertEquals(DiPlaySessionService.ACTION_BOOT_WAIT, serviceStart!!.action)
+        assertEquals(CarPlayHostActivity::class.java.name, activityLaunch!!.component!!.className)
+        assertTrue(activityLaunch!!.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertTrue(activityLaunch!!.getBooleanExtra("com.shilapi.xcertplay.EXTRA_SILENT_CONNECT", false))
         assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=startForegroundService-returned"))
     }
 
