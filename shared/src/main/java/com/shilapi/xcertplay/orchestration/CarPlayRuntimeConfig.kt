@@ -65,6 +65,9 @@ class CarPlayRuntimeConfig(
     val manualHotspotSecurity: ManualHotspotSecurity = ManualHotspotSecurity.WPA2,
     val wirelessBluetoothDeviceAddress: String? = null,
     val locationReportingEnabled: Boolean = false,
+    /** Streams the phone's syslog during wired bring-up for protocol diagnosis; costs
+     *  ~300 ms and a channel on every connect, so it rides the debug-logs setting. */
+    val phoneLogCapture: Boolean = false,
     val wifiP2pPreferredChannel: Int = WifiP2pChannels.AUTO,
     val existingWifiSsid: String = "",
     val existingWifiPassphrase: String = "",

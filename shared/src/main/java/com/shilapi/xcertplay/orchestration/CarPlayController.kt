@@ -2057,8 +2057,9 @@ class CarPlayController(
             )
             onStatus(CarPlayStatus.ConnectingControl)
             val carKitClient = LockdownCarKitClient(mux)
-            // Temporary lab capture, limited to accessory/authentication messages and two minutes.
-            try {
+            // Lab capture for protocol diagnosis (the phone's accessoryd/CarPlay syslog),
+            // gated behind debug logs: it costs ~300 ms and a mux channel per connect.
+            if (config.phoneLogCapture) try {
                 val relay = carKitClient.openService(pairRecord, config.label, "com.apple.syslog_relay")
                 Thread({
                     try {
