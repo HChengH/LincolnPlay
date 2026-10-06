@@ -443,6 +443,7 @@ class CarPlayHostActivity : ComponentActivity() {
     // without delivering onConfigurationChanged, so poll while the activity is visible.
     private val pollConfiguration = object : Runnable {
         override fun run() {
+            refreshDayNightBaseline()
             refreshConfiguration(source = ThemeModeDiagnostics.Source.POLL)
             mainHandler.postDelayed(this, CONFIGURATION_POLL_INTERVAL_MILLIS)
         }
@@ -522,12 +523,13 @@ class CarPlayHostActivity : ComponentActivity() {
         // board speaks drives night mode directly; the ambient sensor stays the fallback.
         HeadLampDialects.attach(this) { night, source ->
             appendLog("Head-unit day/night: source=$source night=$night")
+            lastHeadUnitNightAt = SystemClock.elapsedRealtime()
             nightModeController.external(night)
         }
         logEnvironmentDiagnostics()
         lastConfiguration = Configuration(resources.configuration)
         darkMode = savedInstanceState?.getBoolean("carplay_night_active")
-            ?: nightModeOrNull(resources.configuration.uiMode) ?: false
+            ?: headUnitDayNightBaseline()
         logThemeState(ThemeModeDiagnostics.Source.CREATE, resources.configuration)
         advancedAudioChannelMappingSupported =
             resources.getBoolean(R.bool.config_advanced_audio_channel_mapping)
@@ -582,7 +584,7 @@ class CarPlayHostActivity : ComponentActivity() {
         ambientDelaySeconds = AirPlayPersistence.loadAmbientDelaySeconds(this)
         nightModeController.configure(
             carPlayNightMode,
-            nightModeOrNull(resources.configuration.uiMode) ?: false,
+            headUnitDayNightBaseline(),
             ambientLightThreshold,
             ambientDelaySeconds,
         )
@@ -786,7 +788,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val savedNightMode = AirPlayPersistence.loadCarPlayNightMode(this)
         val savedThreshold = AirPlayPersistence.loadAmbientLightThreshold(this)
         val savedDelay = AirPlayPersistence.loadAmbientDelaySeconds(this)
-        val systemNight = nightModeOrNull(resources.configuration.uiMode) ?: false
+        val systemNight = headUnitDayNightBaseline()
         if (savedNightMode != carPlayNightMode || savedThreshold != ambientLightThreshold || savedDelay != ambientDelaySeconds) {
             carPlayNightMode = savedNightMode
             ambientLightThreshold = savedThreshold
@@ -4100,6 +4102,55 @@ class CarPlayHostActivity : ComponentActivity() {
         )?.let(::appendLog)
     }
 
+    private var lastHeadUnitNightAt = 0L
+    private var lastBaselineRefreshAt = 0L
+    private var lastKnownTwilightLocation: Pair<Double, Double>? = null
+
+    /**
+     * The day/night baseline without a transition: Amap-style current-state probes first
+     * (its adapters' e() queries), then the sunrise equation as the prior. The board's
+     * uiMode is stuck and its DayNightStatus broadcast only fires on change, so this is
+     * what makes the state correct at connect; dialect transitions refine it afterwards.
+     */
+    private fun headUnitDayNightBaseline(): Boolean =
+        HeadLampDialects.currentNight(this) ?: twilightNight()
+
+    /** Periodic re-baseline; a recent dialect signal means the car state already owns the mode. */
+    private fun refreshDayNightBaseline() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastBaselineRefreshAt < DAY_NIGHT_BASELINE_INTERVAL_MILLIS) return
+        lastBaselineRefreshAt = now
+        if (now - lastHeadUnitNightAt < HEAD_UNIT_SIGNAL_YIELD_MILLIS) return
+        val probed = HeadLampDialects.currentNight(this)
+        if (probed != null) {
+            nightModeController.external(probed)
+        } else {
+            nightModeController.systemChanged(twilightNight())
+        }
+    }
+
+    private fun twilightNight(): Boolean =
+        Twilight.isNight(System.currentTimeMillis(), twilightLocation()?.first, twilightLocation()?.second)
+
+    private fun twilightLocation(): Pair<Double, Double>? {
+        lastKnownTwilightLocation?.let { return it }
+        if (!locationPermissionAvailable) return null
+        val located = runCatching {
+            val manager = getSystemService(android.location.LocationManager::class.java)
+                ?: return@runCatching null
+            val location = listOf(
+                android.location.LocationManager.GPS_PROVIDER,
+                android.location.LocationManager.NETWORK_PROVIDER,
+                android.location.LocationManager.PASSIVE_PROVIDER,
+            ).asSequence()
+                .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
+                .maxByOrNull { it.time }
+            location?.let { it.latitude to it.longitude }
+        }.getOrNull()
+        if (located != null) lastKnownTwilightLocation = located
+        return located
+    }
+
     private fun syncAirPlayDarkMode(source: ThemeModeDiagnostics.Source) {
         val session = activeAirPlaySession
         val night = darkMode
@@ -4895,6 +4946,8 @@ class CarPlayHostActivity : ComponentActivity() {
         const val OVERLAY_LOG_LINES = 40
         const val DISPLAY_CHANGE_DEBOUNCE_MILLIS = 500L
         const val CONFIGURATION_POLL_INTERVAL_MILLIS = 2_000L
+        const val DAY_NIGHT_BASELINE_INTERVAL_MILLIS = 10 * 60_000L
+        const val HEAD_UNIT_SIGNAL_YIELD_MILLIS = 30 * 60_000L
         const val RECONNECT_DELAY_MILLIS = 2_000L
         const val IAP_TUNNEL_RECONNECT_DELAY_MILLIS = 15_000L
         const val CONTROLLER_CLOSE_TIMEOUT_MILLIS = 4_000L

@@ -77,6 +77,48 @@ internal object HeadLampDialects {
 
     fun carModeNight(value: Int): Boolean = value != 0
 
+    /**
+     * The current headlamp state, Amap-style: its SetLampStatusFuncRepository adapters each
+     * expose an e() the map engine pulls on demand instead of waiting for a transition.
+     * Mirrors those probes; the first one this board answers wins, null when none do.
+     */
+    fun currentNight(context: Context): Boolean? {
+        val app = context.applicationContext
+        // Neusoft car_status provider: light_switch "on" = night (Amap's QiruiT15 adapter).
+        runCatching {
+            app.contentResolver.query(
+                android.net.Uri.parse("content://com.neusoft.ext.providers/car_status"),
+                arrayOf("light_switch"),
+                null,
+                null,
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val value = runCatching { cursor.getString(0) }.getOrNull()
+                    if (!value.isNullOrEmpty()) return "on".equals(value.lowercase(), ignoreCase = true)
+                }
+            }
+        }
+        // GAC dialect: PowerManager.getBrightNessMode() == 3 means headlamps on.
+        runCatching {
+            val power = app.getSystemService(android.os.PowerManager::class.java) ?: return@runCatching
+            val mode = power.javaClass.methods.firstOrNull { it.name == "getBrightNessMode" }
+                ?.takeIf { it.parameterTypes.isEmpty() }
+                ?.invoke(power) as? Int
+            if (mode != null) return mode == 3
+        }
+        // Settings keys read by the adayo/carmodechange adapters.
+        listOf(ADAYO_SETTINGS, CAR_MODE).forEach { key ->
+            val value = runCatching {
+                Settings.System.getInt(app.contentResolver, key)
+            }.getOrNull()
+            if (value != null) return carModeNight(value)
+        }
+        return null
+    }
+
+    private const val ADAYO_SETTINGS = "car_lamplet"
+
     @Volatile
     private var onNight: ((night: Boolean, source: String) -> Unit)? = null
 
