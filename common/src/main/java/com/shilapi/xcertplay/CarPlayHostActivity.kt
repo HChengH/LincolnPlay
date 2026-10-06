@@ -210,8 +210,28 @@ class CarPlayHostActivity : ComponentActivity() {
             microphoneAvailable = granted
             microphonePermissionResolved = true
             appendLog(if (granted) "Microphone permission granted" else "Microphone permission denied")
+            maybeRequestPairingBackupPermission()
             requestStartupPrerequisites()
         }
+    private val pairingBackupPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            appendLog(if (granted) "Pairing backup storage granted" else "Pairing backup storage denied")
+        }
+
+    /** The iPhone pairing survives reinstalls through an external copy; needs storage once. */
+    private fun maybeRequestPairingBackupPermission() {
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) return
+        runCatching {
+            if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                appendLog("Requesting storage permission to back up the iPhone pairing")
+                pairingBackupPermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+        }.onFailure { error ->
+            appendLog("Pairing backup permission dialog unavailable: ${error.message}")
+        }
+    }
     private val locationPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
             awaitingLocationPermission = false
@@ -579,6 +599,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 .onFailure { error ->
                     microphonePermissionResolved = true
                     appendLog("Microphone permission dialog unavailable: ${error.message}")
+                    maybeRequestPairingBackupPermission()
                     requestStartupPrerequisites()
                 }
         }

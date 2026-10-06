@@ -931,6 +931,7 @@ object AirPlayPersistence {
 
     fun loadLockdownRecord(context: Context): LockdownPairRecord? {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        if (!prefs.contains(KEY_LOCKDOWN_HOST_ID)) restoreExternalPairBackup(context, prefs)
         val hostId = prefs.getString(KEY_LOCKDOWN_HOST_ID, null) ?: return null
         val systemBuid = prefs.getString(KEY_LOCKDOWN_SYSTEM_BUID, null) ?: return null
         val wifiMac = prefs.getString(KEY_LOCKDOWN_WIFI_MAC, null) ?: return null
@@ -958,18 +959,93 @@ object AirPlayPersistence {
     }
 
     fun saveLockdownRecord(context: Context, record: LockdownPairRecord) {
+        val values = mapOf(
+            KEY_LOCKDOWN_HOST_ID to record.hostId,
+            KEY_LOCKDOWN_SYSTEM_BUID to record.systemBuid,
+            KEY_LOCKDOWN_WIFI_MAC to record.wifiMacAddress,
+            KEY_LOCKDOWN_DEVICE_PUBLIC to record.devicePublicKeyPem.toHex(),
+            KEY_LOCKDOWN_DEVICE_CERT to record.deviceCertificatePem.toHex(),
+            KEY_LOCKDOWN_HOST_PRIVATE to record.hostPrivateKeyPem.toHex(),
+            KEY_LOCKDOWN_HOST_CERT to record.hostCertificatePem.toHex(),
+            KEY_LOCKDOWN_ROOT_PRIVATE to record.rootPrivateKeyPem.toHex(),
+            KEY_LOCKDOWN_ROOT_CERT to record.rootCertificatePem.toHex(),
+        )
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_LOCKDOWN_HOST_ID, record.hostId)
-            .putString(KEY_LOCKDOWN_SYSTEM_BUID, record.systemBuid)
-            .putString(KEY_LOCKDOWN_WIFI_MAC, record.wifiMacAddress)
-            .putString(KEY_LOCKDOWN_DEVICE_PUBLIC, record.devicePublicKeyPem.toHex())
-            .putString(KEY_LOCKDOWN_DEVICE_CERT, record.deviceCertificatePem.toHex())
-            .putString(KEY_LOCKDOWN_HOST_PRIVATE, record.hostPrivateKeyPem.toHex())
-            .putString(KEY_LOCKDOWN_HOST_CERT, record.hostCertificatePem.toHex())
-            .putString(KEY_LOCKDOWN_ROOT_PRIVATE, record.rootPrivateKeyPem.toHex())
-            .putString(KEY_LOCKDOWN_ROOT_CERT, record.rootCertificatePem.toHex())
+            .putString(KEY_LOCKDOWN_HOST_ID, values[KEY_LOCKDOWN_HOST_ID])
+            .putString(KEY_LOCKDOWN_SYSTEM_BUID, values[KEY_LOCKDOWN_SYSTEM_BUID])
+            .putString(KEY_LOCKDOWN_WIFI_MAC, values[KEY_LOCKDOWN_WIFI_MAC])
+            .putString(KEY_LOCKDOWN_DEVICE_PUBLIC, values[KEY_LOCKDOWN_DEVICE_PUBLIC])
+            .putString(KEY_LOCKDOWN_DEVICE_CERT, values[KEY_LOCKDOWN_DEVICE_CERT])
+            .putString(KEY_LOCKDOWN_HOST_PRIVATE, values[KEY_LOCKDOWN_HOST_PRIVATE])
+            .putString(KEY_LOCKDOWN_HOST_CERT, values[KEY_LOCKDOWN_HOST_CERT])
+            .putString(KEY_LOCKDOWN_ROOT_PRIVATE, values[KEY_LOCKDOWN_ROOT_PRIVATE])
+            .putString(KEY_LOCKDOWN_ROOT_CERT, values[KEY_LOCKDOWN_ROOT_CERT])
             .apply()
+        writeExternalPairBackup(context, values)
     }
+
+    /**
+     * A reinstall wipes the app-private pairing while the iPhone keeps its half, and pairing
+     * fresh against that stale phone state is what makes the first connect crawl (and
+     * sometimes demand forgetting the accessory on the phone). An external copy of the record
+     * survives reinstalls on this pre-scoped-storage board. Best-effort: silently skipped
+     * until the once-granted storage permission is there.
+     */
+    private fun externalPairBackupFile(context: Context): File? {
+        if (android.os.Build.VERSION.SDK_INT > android.os.Build.VERSION_CODES.P) return null
+        if (android.os.Environment.getExternalStorageState() != android.os.Environment.MEDIA_MOUNTED) return null
+        if (context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) return null
+        return File(android.os.Environment.getExternalStorageDirectory(), "DiPlay/pairing-record.properties")
+    }
+
+    private fun writeExternalPairBackup(context: Context, values: Map<String, String>) {
+        runCatching {
+            val target = externalPairBackupFile(context) ?: return
+            val properties = java.util.Properties()
+            values.forEach { (key, value) -> properties.setProperty(key, value) }
+            target.parentFile?.takeIf { !it.exists() }?.mkdirs()
+            java.io.FileOutputStream(target).use { properties.store(it, "DiPlay iPhone lockdown pairing backup") }
+            DiagnosticSnifferHook.post("Pairing backup written to ${target.path}")
+        }.onFailure { error ->
+            DiagnosticSnifferHook.post("Pairing backup skipped: ${error.javaClass.simpleName}")
+        }
+    }
+
+    private fun restoreExternalPairBackup(context: Context, prefs: SharedPreferences) {
+        runCatching {
+            val source = externalPairBackupFile(context) ?: return
+            if (!source.exists()) return
+            val properties = java.util.Properties()
+            java.io.FileInputStream(source).use { properties.load(it) }
+            val values = LOCKDOWN_BACKUP_KEYS.associateWith { key ->
+                properties.getProperty(key)?.takeIf { it.isNotEmpty() }
+            }
+            if (values.values.any { it == null }) {
+                DiagnosticSnifferHook.post("Pairing backup incomplete; ignoring")
+                return
+            }
+            prefs.edit().apply {
+                values.forEach { (key, value) -> putString(key, value) }
+            }.apply()
+            DiagnosticSnifferHook.post("Pairing record restored from external backup")
+        }.onFailure { error ->
+            DiagnosticSnifferHook.post("Pairing backup restore failed: ${error.javaClass.simpleName}")
+        }
+    }
+
+    private val LOCKDOWN_BACKUP_KEYS = arrayOf(
+        KEY_LOCKDOWN_HOST_ID,
+        KEY_LOCKDOWN_SYSTEM_BUID,
+        KEY_LOCKDOWN_WIFI_MAC,
+        KEY_LOCKDOWN_DEVICE_PUBLIC,
+        KEY_LOCKDOWN_DEVICE_CERT,
+        KEY_LOCKDOWN_HOST_PRIVATE,
+        KEY_LOCKDOWN_HOST_CERT,
+        KEY_LOCKDOWN_ROOT_PRIVATE,
+        KEY_LOCKDOWN_ROOT_CERT,
+    )
 
     fun clearLockdownRecord(context: Context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
@@ -983,6 +1059,7 @@ object AirPlayPersistence {
             .remove(KEY_LOCKDOWN_ROOT_PRIVATE)
             .remove(KEY_LOCKDOWN_ROOT_CERT)
             .apply()
+        runCatching { externalPairBackupFile(context)?.delete() }
     }
 
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it.toInt() and 0xff) }
