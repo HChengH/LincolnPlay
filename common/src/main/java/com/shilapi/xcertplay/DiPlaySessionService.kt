@@ -13,7 +13,13 @@ import android.os.Build
 import android.os.IBinder
 import com.shilapi.xcertplay.host.R
 
-/** Keeps an explicitly started connection alive when another car app is in the foreground. */
+/**
+ * Keeps an explicitly started connection alive when another car app is in the foreground.
+ *
+ * Only started once a session is actually active (see onSessionActive in
+ * CarPlayHostActivity), so the mandatory foreground-service notification never
+ * appears while the host is merely waiting for the iPhone.
+ */
 class DiPlaySessionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -26,15 +32,10 @@ class DiPlaySessionService : Service() {
         manager.createNotificationChannel(NotificationChannel(CHANNEL, "CarPlay connection", NotificationManager.IMPORTANCE_LOW))
         val open = PendingIntent.getActivity(this, 0, Intent(this, CarPlayHostActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 1, Intent(this, DiPlaySessionService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        // The boot path starts this service before any session exists: say so instead
-        // of claiming a connection. The host's own start (with a stored session) flips
-        // the text back to "running" on its way through onStartCommand.
-        val text = if (CarPlayBackgroundSession.hasSession()) "CarPlay connection running"
-        else "Waiting for iPhone — plug in to connect"
         val notification = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_diplay_notification)
             .setContentTitle("DiPlay")
-            .setContentText(text)
+            .setContentText("CarPlay connection running")
             .setContentIntent(open).setOngoing(true)
             .addAction(Notification.Action.Builder(null, "Disconnect", stop).build()).build()
         if (Build.VERSION.SDK_INT >= 29) {
@@ -60,8 +61,6 @@ class DiPlaySessionService : Service() {
     }
     companion object {
         const val ACTION_STOP = "com.shihab.diplay.DISCONNECT"
-        /** Boot warm-start: keep the process alive with a "waiting" notification, no UI. */
-        const val ACTION_BOOT_WAIT = "com.shilapi.xcertplay.BOOT_WAIT"
         private const val CHANNEL = "diplay_connection"
     }
 }

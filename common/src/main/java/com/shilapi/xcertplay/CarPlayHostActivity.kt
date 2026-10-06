@@ -621,10 +621,10 @@ class CarPlayHostActivity : ComponentActivity() {
         // user's launcher, radio or navigation stays on top and fully interactive until
         // then. The theme's windowDisablePreview plus parking the task here, before the
         // window is ever added, is what makes the launch invisible. (Boot launches us
-        // this way too, after arming the waiting service, so permissions, VPN consent
-        // and the USB controller are all ready before the cable arrives.) Permission
-        // dialogs are intentionally NOT suppressed: a dialog that appears here means
-        // the user never granted it, and letting it ask in the open beats failing quietly.
+        // this way too, so permissions, VPN consent and the USB controller are all
+        // ready before the cable arrives.) Permission dialogs are intentionally NOT
+        // suppressed: a dialog that appears here means the user never granted it, and
+        // letting it ask in the open beats failing quietly.
         val launchIntent = intent
         silentConnect = (launchIntent?.getBooleanExtra(EXTRA_SILENT_CONNECT, false) ?: false) ||
             (launchIntent != null && isIphoneUsbAttachment(launchIntent) &&
@@ -3907,6 +3907,11 @@ class CarPlayHostActivity : ComponentActivity() {
                     reconnectAttempts = 0
                     logThemeState(ThemeModeDiagnostics.Source.SESSION_ACTIVE, resources.configuration)
                     syncAirPlayDarkMode(ThemeModeDiagnostics.Source.SESSION_ACTIVE)
+                    // The session-keeper service (and its mandatory notification) starts
+                    // only now that CarPlay is real — never while merely waiting for the
+                    // iPhone, so a silent boot stays completely invisible.
+                    runCatching { startForegroundService(Intent(this, DiPlaySessionService::class.java)) }
+                        .onFailure { appendLog("Session service could not start: ${it.javaClass.simpleName}") }
                     if (menuOpen) return@runOnUiThread
                     appendLog("AirPlay session active")
                     // The silent-connect host surfaces now: CarPlay is ready to show.
@@ -4196,11 +4201,10 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
         try {
-            startForegroundService(Intent(this, DiPlaySessionService::class.java))
             next.start()
         } catch (error: RuntimeException) {
             appendLog("Connection could not start: ${error.javaClass.simpleName}")
-            shutdown(false, "foreground service could not start")
+            shutdown(false, "controller could not start")
             setConnectionStage(getString(R.string.could_not_start_carplay_return_to_diplay_and_check_app_per))
         }
     }
