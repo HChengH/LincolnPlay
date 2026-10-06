@@ -4166,7 +4166,7 @@ class CarPlayHostActivity : ComponentActivity() {
             return
         }
         airPlayCommandExecutor.let { executor ->
-            val task = {
+            val task: () -> Unit = {
                 try {
                     val sent = session.setNightMode(night)
                     // A successful write does not prove the iPhone changed its appearance.
