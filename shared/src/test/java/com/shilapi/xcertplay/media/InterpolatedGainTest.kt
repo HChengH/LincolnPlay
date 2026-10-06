@@ -11,7 +11,7 @@ class InterpolatedGainTest {
     fun endpointsAreExactAndMonotonic() {
         assertEquals(0.12f, interpolatedGain(0.12f, 1f, 0f), 1e-6f)
         assertEquals(1f, interpolatedGain(0.12f, 1f, 1f), 1e-6f)
-        assertEquals(1f, interpolatedGain(1f, 0.12f, 1f), 1e-6f)
+        assertEquals(0.12f, interpolatedGain(1f, 0.12f, 1f), 1e-6f)
         var previous = interpolatedGain(1f, 0.12f, 0f)
         for (step in 1..20) {
             val value = interpolatedGain(1f, 0.12f, step / 20f)
@@ -37,6 +37,6 @@ class InterpolatedGainTest {
     @Test
     fun silentEndsFallBackToLinear() {
         assertEquals(0.05f, interpolatedGain(0f, 0.2f, 0.25f), 1e-6f)
-        assertEquals(0.15f, interpolatedGain(0.2f, 0f, 0.75f), 1e-6f)
+        assertEquals(0.05f, interpolatedGain(0.2f, 0f, 0.75f), 1e-6f)
     }
 }
