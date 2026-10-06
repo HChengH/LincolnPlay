@@ -9,11 +9,10 @@ import android.util.Log
  * Starts the CarPlay host after boot when the user has enabled the startup option.
  *
  * The host launches silently: parked behind the launcher before its window is
- * added, no starting window, no notification — boot stays completely invisible.
- * Being alive early front-loads permissions, VPN consent, the bootstrap and the
- * USB controller, so the cable connects immediately when it arrives. The
- * foreground service (and its notification) only appears once a session is
- * actually active. The DiPlay settings screen is never opened by the boot path.
+ * added, no starting window — boot itself draws nothing. Being alive early
+ * front-loads permissions, VPN consent, the bootstrap and the USB controller,
+ * so the cable connects immediately when it arrives. The DiPlay settings screen
+ * is never opened by the boot path.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

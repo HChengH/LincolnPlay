@@ -13,13 +13,7 @@ import android.os.Build
 import android.os.IBinder
 import com.shilapi.xcertplay.host.R
 
-/**
- * Keeps an explicitly started connection alive when another car app is in the foreground.
- *
- * Only started once a session is actually active (see onSessionActive in
- * CarPlayHostActivity), so the mandatory foreground-service notification never
- * appears while the host is merely waiting for the iPhone.
- */
+/** Keeps an explicitly started connection alive when another car app is in the foreground. */
 class DiPlaySessionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
