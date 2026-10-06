@@ -3924,6 +3924,8 @@ class CarPlayHostActivity : ComponentActivity() {
             // AirPlayInfoPlist) the guidance usage no longer muffles them, keeping a volume
             // path the media bus cannot offer.
             guidanceAttributes = { 12 to 1 },
+            // Picked from upstream 0.2.15 #417: hint the decoder's operating rate.
+            mainVideoFrameRate = fps,
         )
     }
 
