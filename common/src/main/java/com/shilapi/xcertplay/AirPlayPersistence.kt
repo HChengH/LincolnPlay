@@ -1026,9 +1026,9 @@ object AirPlayPersistence {
                 DiagnosticSnifferHook.post("Pairing backup incomplete; ignoring")
                 return
             }
-            prefs.edit().apply {
-                values.forEach { (key, value) -> putString(key, value) }
-            }.apply()
+            val editor = prefs.edit()
+            values.forEach { (key, value) -> editor.putString(key, value!!) }
+            editor.apply()
             DiagnosticSnifferHook.post("Pairing record restored from external backup")
         }.onFailure { error ->
             DiagnosticSnifferHook.post("Pairing backup restore failed: ${error.javaClass.simpleName}")
