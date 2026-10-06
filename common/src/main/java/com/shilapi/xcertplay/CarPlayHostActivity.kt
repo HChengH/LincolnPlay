@@ -570,7 +570,9 @@ class CarPlayHostActivity : ComponentActivity() {
             AirPlayPersistence.saveWirelessEnabled(this, false)
         }
         if (runCatching { DiPlayBootstrap.ensure(this, AirPlayPersistence.loadMfiTarget(this)) }.isFailure) {
-            startActivity(Intent(this, DiPlayActivity::class.java))
+            // NEW_TASK: a task-local launch would strand DiPlayActivity in this host task.
+            startActivity(Intent(this, DiPlayActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             finish(); return
         }
         WheelKeyService.restoreIfNeeded(this)
@@ -866,15 +868,14 @@ class CarPlayHostActivity : ComponentActivity() {
     /** Brings the parked CarPlay task back to the front without recreating the host. */
     private fun surfaceFromBackground() {
         if (isFinishing) return
-        // Two shots at the front: OEM head-unit ROMs commonly drop activity starts that
-        // come from a backgrounded activity (verified on the SYNC+ board: the settings
-        // page stayed up while the session streamed audio behind it). The retry from the
-        // running foreground service's context is the path such ROMs still honour. Both
-        // resolve to the same singleTask instance, so a stock ROM just sees a no-op repeat.
-        val direct = runCatching {
-            startActivity(Intent(this, CarPlayHostActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
-        }
+        // CLEAR_TOP drops anything stacked above the host in its own task — DiPlayActivity
+        // used to pile up there (showDiPlayHome launched it task-locally), so "front the
+        // task" surfaced the settings page instead of CarPlay. The service retry covers
+        // ROMs that drop starts from backgrounded activities; both resolve to the same
+        // singleTask instance.
+        val surface = Intent(this, CarPlayHostActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        val direct = runCatching { startActivity(surface) }
         appendLog(
             "Silent connect surfacing direct=" + direct.isSuccess +
                 (direct.exceptionOrNull()?.let { " err=${it.javaClass.simpleName}" } ?: ""),
@@ -4632,8 +4633,11 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun showDiPlayHome(page: String = "home") {
         controller?.sendTouch(emptyList())
+        // NEW_TASK keeps DiPlay in its own task: launched task-locally it stacks on top of
+        // the host, and later "front the CarPlay task" surfaces the settings page instead.
         startActivity(Intent(this, DiPlayActivity::class.java)
-            .putExtra("page", page).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+            .putExtra("page", page)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
     }
 
     private fun openSettingsMenu() {

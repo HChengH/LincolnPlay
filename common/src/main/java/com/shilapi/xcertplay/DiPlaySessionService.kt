@@ -49,9 +49,10 @@ class DiPlaySessionService : Service() {
         if (intent?.action == ACTION_SURFACE_HOST) {
             // The parked host asks its foreground service to bring it up: ROMs that drop
             // background activity starts usually still honour the foreground-service context.
+            // CLEAR_TOP matches the host's own surfacing: junk stacked in the host task goes.
             runCatching {
                 startActivity(Intent(this, CarPlayHostActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_CLEAR_TOP))
             }.onFailure { Log.w(TAG, "could not surface CarPlay from the service", it) }
         }
         return START_NOT_STICKY
