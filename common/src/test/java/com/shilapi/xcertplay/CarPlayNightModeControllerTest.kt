@@ -231,12 +231,12 @@ class CarPlayNightModeControllerTest {
     @Test fun defaultThresholdAndDelayApplyInBothDirections() {
         val f = Fixture()
         f.controller.configure(CarPlayNightMode.AMBIENT, false)
-        f.light.emit(29f)
+        f.light.emit(399f)
         f.clock.advance(1_999)
         assertFalse(f.controller.night)
         f.clock.advance(1)
         assertTrue(f.controller.night)
-        f.light.emit(30f)
+        f.light.emit(1_001f)
         f.clock.advance(1_999)
         assertTrue(f.controller.night)
         f.clock.advance(1)
@@ -245,7 +245,7 @@ class CarPlayNightModeControllerTest {
 
     @Test fun customDelayAppliesInBothDirections() {
         val f = Fixture()
-        f.controller.configure(CarPlayNightMode.AMBIENT, false, delaySeconds = 1)
+        f.controller.configure(CarPlayNightMode.AMBIENT, false, AmbientLightThreshold(50), delaySeconds = 1)
         f.light.emit(10f)
         f.clock.advance(999)
         assertFalse(f.controller.night)
