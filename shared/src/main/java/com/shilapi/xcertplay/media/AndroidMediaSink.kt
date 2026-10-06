@@ -1572,13 +1572,17 @@ private class AudioRenderer(
         val end = offset + (length - length % 2)
         val samples = (end - offset) / 2
         if (samples <= 0) return
-        // Ramp across the chunk so duck/restore transitions are not audible hard steps.
+        // The ramp spans a bounded window with exponential interpolation: loudness is
+        // logarithmic, so an amplitude-linear ramp sounds fast-then-crawly, and a ramp
+        // implicitly as long as the write chunk made recovery pace drift with block sizes.
         val startGain = effectiveGain
         val targetGain = gain
+        val rampSamples = minOf(samples, maxOf(1, format.sampleRate * GAIN_RAMP_MILLIS / 1_000))
         var position = offset
         var index = 0
         while (position < end) {
-            val g = startGain + (targetGain - startGain) * index / samples
+            val progress = (index.toFloat() / rampSamples).coerceAtMost(1f)
+            val g = interpolatedGain(startGain, targetGain, progress)
             val sample = (data[position].toInt() and 0xff) or (data[position + 1].toInt() shl 8)
             val scaled = (sample * g).toInt().coerceIn(-32768, 32767)
             data[position] = scaled.toByte()
@@ -1650,6 +1654,7 @@ private class AudioRenderer(
 
     private companion object {
         const val TAG = "xcertplay-usb"
+        const val GAIN_RAMP_MILLIS = 250
         const val AAC_OBJECT_TYPE_LC = 2
         const val MIN_OPUS_PACKET_BYTES = 4
         const val OPUS_CODEC_DELAY_NANOS = 6_500_000L
@@ -1664,4 +1669,12 @@ private class AudioRenderer(
         const val STATS_WINDOW_NS = 5_000_000_000L
         const val DECODED_BUFFER_LOG_INTERVAL = 50
     }
+}
+
+/** Exponential (perceptually even) gain interpolation; linear when either end is silent. */
+internal fun interpolatedGain(start: Float, target: Float, progress: Float): Float {
+    if (start <= 0.0001f || target <= 0.0001f) {
+        return start + (target - start) * progress
+    }
+    return (start * Math.pow((target / start).toDouble(), progress.coerceIn(0f, 1f).toDouble())).toFloat()
 }
