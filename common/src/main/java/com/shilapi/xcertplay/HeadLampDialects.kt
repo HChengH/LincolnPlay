@@ -22,12 +22,14 @@ internal object HeadLampDialects {
     private const val GAEI = "gaei.action.DAY_NIGHT_ACTION"
     private const val NEUSOFT = "com.neusoft.action.carmodechange"
     private const val INCALL = "com.incall.action.carmodechange"
+    private const val DAY_NIGHT_STATUS = "DayNightStatus"
     private const val CAR_MODE = "car_mode"
 
     /** The dialect's night value, or null when the intent carries no usable one. */
     fun nightFrom(action: String?, intent: Intent): Boolean? {
         val extras = intent.extras ?: return null
         return when (action) {
+            DAY_NIGHT_STATUS -> nightFromDayNightStatus(extras)
             FLY -> {
                 val value = sequenceOf("FLY_KEY_VALUE", "FLY_DAYNIGHT_MODE", "FLY_PM_MODE")
                     .mapNotNull { extras.getString(it) }
@@ -46,6 +48,31 @@ internal object HeadLampDialects {
             // value from Settings.System car_mode instead (see [carModeNight]).
             else -> null
         }
+    }
+
+    /**
+     * This board's own dialect: the system theme service broadcasts DayNightStatus, which the
+     * lyrics-board app relays into Amap's 10048. The extras are polymorphic across firmware:
+     * `data` carries an int (1 = night, 2 = day) or a boolean, with a boolean `night` fallback.
+     */
+    private fun nightFromDayNightStatus(extras: android.os.Bundle): Boolean? {
+        if (extras.containsKey("data")) {
+            return when (val value = extras.get("data")) {
+                is Boolean -> value
+                is Int -> when (value) {
+                    1 -> true
+                    2 -> false
+                    else -> null
+                }
+                is Long -> when (value.toInt()) {
+                    1 -> true
+                    2 -> false
+                    else -> null
+                }
+                else -> null
+            }
+        }
+        return if (extras.containsKey("night")) extras.getBoolean("night", false) else null
     }
 
     fun carModeNight(value: Int): Boolean = value != 0
@@ -79,7 +106,7 @@ internal object HeadLampDialects {
             }
         }
         val filter = IntentFilter().apply {
-            listOf(FLY, ADAYO, GAEI, NEUSOFT, INCALL).forEach(::addAction)
+            listOf(FLY, ADAYO, GAEI, NEUSOFT, INCALL, DAY_NIGHT_STATUS).forEach(::addAction)
         }
         ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
         app.contentResolver.registerContentObserver(

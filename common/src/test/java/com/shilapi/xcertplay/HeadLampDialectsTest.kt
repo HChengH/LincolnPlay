@@ -8,12 +8,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [29], manifest = Config.NONE)
 class HeadLampDialectsTest {
+    private val dayNightStatus = "DayNightStatus"
     private val fly = "FLY.ANDROID.NAVI.MSG.SENDER"
     private val adayo = "adayo_navi_lamplet_changed_action"
     private val gaei = "gaei.action.DAY_NIGHT_ACTION"
+
+    @Test
+    fun parsesThisBoardsDayNightStatusDialect() {
+        assertTrue(HeadLampDialects.nightFrom(dayNightStatus, Intent().putExtra("data", 1))!!)
+        assertFalse(HeadLampDialects.nightFrom(dayNightStatus, Intent().putExtra("data", 2))!!)
+        assertTrue(HeadLampDialects.nightFrom(dayNightStatus, Intent().putExtra("data", true))!!)
+        assertFalse(HeadLampDialects.nightFrom(dayNightStatus, Intent().putExtra("data", false))!!)
+        assertTrue(HeadLampDialects.nightFrom(dayNightStatus, Intent().putExtra("night", true))!!)
+        assertFalse(HeadLampDialects.nightFrom(dayNightStatus, Intent().putExtra("night", false))!!)
+        assertNull(HeadLampDialects.nightFrom(dayNightStatus, Intent()))
+    }
 
     @Test
     fun parsesTheFlyDialectFromAnyOfItsThreeExtras() {

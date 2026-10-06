@@ -21,6 +21,7 @@ import com.shilapi.xcertplay.DiagnosticSnifferHook
 object DayNightSignalSniffer {
     private const val TAG = "DiPlay-DayNightSniff"
     private val actions = arrayOf(
+        "DayNightStatus",
         "FLY.ANDROID.NAVI.MSG.SENDER",
         "adayo_navi_lamplet_changed_action",
         "gaei.action.DAY_NIGHT_ACTION",
