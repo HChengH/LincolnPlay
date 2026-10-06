@@ -1013,7 +1013,7 @@ object AirPlayPersistence {
         }
     }
 
-    private fun restoreExternalPairBackup(context: Context, prefs: SharedPreferences) {
+    private fun restoreExternalPairBackup(context: Context, prefs: android.content.SharedPreferences) {
         runCatching {
             val source = externalPairBackupFile(context) ?: return
             if (!source.exists()) return
