@@ -579,6 +579,11 @@ class CarPlayHostActivity : ComponentActivity() {
         } else if (microphonePermissionResolved) {
             requestStartupPrerequisites()
         } else {
+            // Fire the transport consent in parallel with the microphone dialog: both must
+            // resolve before maybeStartCarPlay creates the controller anyway, and waiting
+            // for the dialogs serially put their combined latency on every cold start.
+            // On fresh installs the two dialogs simply queue one behind the other.
+            requestStartupPrerequisites()
             appendLog("Requesting microphone permission")
             // Stripped-down head-unit ROMs can lack the permission dialog; fail readably, not fatally.
             runCatching { microphonePermission.launch(Manifest.permission.RECORD_AUDIO) }
