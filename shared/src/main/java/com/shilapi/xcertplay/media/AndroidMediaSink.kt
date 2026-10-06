@@ -1577,7 +1577,9 @@ private class AudioRenderer(
         // with whatever block size the writer dequeues.
         val startGain = effectiveGain
         val targetGain = gain
-        val rampSamples = minOf(samples, maxOf(1, format.sampleRate * GAIN_RAMP_MILLIS / 1_000))
+        // Fast attack, slower release - the compressor timing the ear expects from ducking.
+        val rampMillis = if (targetGain < startGain) DUCK_RAMP_MILLIS else RECOVER_RAMP_MILLIS
+        val rampSamples = minOf(samples, maxOf(1, format.sampleRate * rampMillis / 1_000))
         var position = offset
         var index = 0
         while (position < end) {
@@ -1654,7 +1656,8 @@ private class AudioRenderer(
 
     private companion object {
         const val TAG = "xcertplay-usb"
-        const val GAIN_RAMP_MILLIS = 250
+        const val DUCK_RAMP_MILLIS = 120
+        const val RECOVER_RAMP_MILLIS = 220
         const val AAC_OBJECT_TYPE_LC = 2
         const val MIN_OPUS_PACKET_BYTES = 4
         const val OPUS_CODEC_DELAY_NANOS = 6_500_000L
