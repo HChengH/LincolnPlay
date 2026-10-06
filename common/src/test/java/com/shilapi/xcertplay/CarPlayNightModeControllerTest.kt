@@ -186,25 +186,25 @@ class CarPlayNightModeControllerTest {
 
     @Test fun interruptedBrightReadingAlsoRequiresFiveNewSeconds() {
         val f = Fixture(true)
-        f.light.emit(101f)
+        f.light.emit(200f)
         f.clock.advance(4_000)
         f.light.emit(49f)
         f.clock.advance(2_000)
         assertTrue(f.controller.night)
-        f.light.emit(101f)
+        f.light.emit(200f)
         f.clock.advance(4_999)
         assertTrue(f.controller.night)
         f.clock.advance(1)
         assertFalse(f.controller.night)
     }
 
-    @Test fun customThresholdControlsBothDirectionsWithoutADeadBand() {
+    @Test fun customThresholdControlsBothDirectionsWithTheHeadlampBand() {
         val f = Fixture()
         f.controller.configure(CarPlayNightMode.AMBIENT, false, AmbientLightThreshold(200), 5)
         f.light.emit(150f)
         f.clock.advance(5_000)
         assertTrue(f.controller.night)
-        f.light.emit(200f)
+        f.light.emit(600f)
         f.clock.advance(5_000)
         assertFalse(f.controller.night)
     }
