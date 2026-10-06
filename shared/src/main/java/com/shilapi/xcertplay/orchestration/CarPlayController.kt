@@ -326,6 +326,7 @@ class CarPlayController(
 
     private val sessionListener = object : AirPlaySessionListener {
         override fun onSessionActive(session: AirPlaySession) {
+            wiredSessionWatchdogSeen.set(true)
             val replacement = activeSession !== session
             if (replacement) {
                 BydNavigationOutputs.start(appContext)
@@ -2030,6 +2031,7 @@ class CarPlayController(
 
     private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge, generation: Int) {
         fun cancelled() = closed || generation != wiredGeneration.get()
+        wiredSessionWatchdogSeen.set(false)
         phase = Phase.CONTROL
         var ncmOwnedLocally = true
         try {
@@ -2177,6 +2179,7 @@ class CarPlayController(
                 deviceIdentifier = ncmHostMac.macString(),
             )
             onStatus(CarPlayStatus.RunningControl)
+            scheduleWiredSessionWatchdog(generation)
             debugLog(
                 "wired iAP2 runtime control starting " +
                     "location=${config.identification.locationInformationEnabled} " +
@@ -2206,6 +2209,27 @@ class CarPlayController(
         } finally {
             if (ncmOwnedLocally) ncm.close()
         }
+    }
+
+    /**
+     * Wired has no control-loop timeout by design, but the phone can wedge after an abrupt
+     * mid-session teardown: the iAP2 control channel comes up, we advertise the endpoint,
+     * and the phone's AirPlay client never connects (2026-10-07 log, attempt 2: 23 s of
+     * idle reads, user eventually re-plugged at 120 s). Recycle the bring-up instead of
+     * hanging forever; a healthy connect reached AirPlay within 10.1 s in every capture.
+     */
+    private fun scheduleWiredSessionWatchdog(generation: Int) {
+        if (config.transport != CarPlayTransport.WIRED) return
+        mainHandler.postDelayed(
+            {
+                if (closed || generation != wiredGeneration.get()) return@postDelayed
+                if (wiredSessionWatchdogSeen.get()) return@postDelayed
+                val message = "AirPlay session did not start within $WIRED_SESSION_WATCHDOG_MILLIS ms of the wired control link; recycling"
+                debugLog(message)
+                fail(IOException(message))
+            },
+            WIRED_SESSION_WATCHDOG_MILLIS,
+        )
     }
 
     private fun pairNewRecord(client: LockdownPairingClient): LockdownPairRecord =
@@ -2829,7 +2853,9 @@ class CarPlayController(
         private const val REENUMERATION_POLL_INTERVAL_MILLIS = 400L
         private const val REENUMERATION_FALLBACK_MILLIS = 8_000L
         private const val FORCE_REENUMERATION_AFTER_FAILURE_MILLIS = 60_000L
+        private const val WIRED_SESSION_WATCHDOG_MILLIS = 20_000L
         private val wiredFailureAt = AtomicLong(0)
+        private val wiredSessionWatchdogSeen = AtomicBoolean(false)
         private const val EXECUTOR_CLOSE_TIMEOUT_MILLIS = 2_000L
         private const val ADAPTER_ADDRESS_PLACEHOLDER = "02:00:00:00:00:00"
         private val BLUETOOTH_ADDRESS = Regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")
