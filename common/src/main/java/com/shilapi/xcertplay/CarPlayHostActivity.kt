@@ -3910,7 +3910,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     // The session-keeper service (and its mandatory notification) starts
                     // only now that CarPlay is real — never while merely waiting for the
                     // iPhone, so a silent boot stays completely invisible.
-                    runCatching { startForegroundService(Intent(this, DiPlaySessionService::class.java)) }
+                    runCatching { startForegroundService(Intent(this@CarPlayHostActivity, DiPlaySessionService::class.java)) }
                         .onFailure { appendLog("Session service could not start: ${it.javaClass.simpleName}") }
                     if (menuOpen) return@runOnUiThread
                     appendLog("AirPlay session active")
