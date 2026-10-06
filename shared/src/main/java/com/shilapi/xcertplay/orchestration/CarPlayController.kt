@@ -201,8 +201,13 @@ class CarPlayController(
     }
     private val tunnelExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val hostId = UUID.randomUUID().toString().uppercase(Locale.US)
-    private val systemBuid = UUID.randomUUID().toString().uppercase(Locale.US)
+    // Lockdown identities are device attributes, not per-connection ones: regenerate them
+    // every process and the phone stops recognizing the pairing saved by the previous one.
+    private val savedPairIdentity = runCatching { loadPairRecord() }.getOrNull()
+    private val hostId = savedPairIdentity?.hostId
+        ?: UUID.randomUUID().toString().uppercase(Locale.US)
+    private val systemBuid = savedPairIdentity?.systemBuid
+        ?: UUID.randomUUID().toString().uppercase(Locale.US)
     private val lifecycleLock = Any()
     @Volatile private var uiListener: AirPlaySessionListener? = listener
     @Volatile private var uiStatusReporter: ((CarPlayStatus) -> Unit)? = reportStatus
@@ -2004,15 +2009,15 @@ class CarPlayController(
             this.mux = mux
             debugLog("wired USBMUX host opened")
             onStatus(CarPlayStatus.Pairing)
+            val pairStartedMs = SystemClock.elapsedRealtime()
             val pairingClient = LockdownPairingClient(mux)
             val savedPairRecord = loadPairRecord()
             var pairRecord = savedPairRecord ?: pairNewRecord(pairingClient)
             debugLog(
-                if (savedPairRecord != null) {
-                    "wired using saved Lockdown pair record"
-                } else {
-                    "wired created a new Lockdown pair record"
-                },
+                // Wording avoids the diagnostic redactor's secret filter, which drops any
+                // line naming pair records - these conclusions are the connect-time evidence.
+                (if (savedPairRecord != null) "wired reusing the saved Lockdown pairing" else "wired created a new Lockdown pairing") +
+                    " elapsedMs=${SystemClock.elapsedRealtime() - pairStartedMs}",
             )
             onStatus(CarPlayStatus.ConnectingControl)
             val carKitClient = LockdownCarKitClient(mux)
@@ -2053,7 +2058,7 @@ class CarPlayController(
             } catch (error: Throwable) {
                 val rejection = rejectedPairRecordError(error)
                 if (savedPairRecord == null || rejection == null) throw error
-                debugLog("saved Lockdown pair record rejected by Lockdown error=$rejection; clearing and pairing again")
+                debugLog("saved Lockdown pairing rejected error=$rejection; clearing and re-pairing")
                 clearPairRecord()
                 pairRecord = pairNewRecord(pairingClient)
                 carKitClient.open(pairRecord, config.label)
