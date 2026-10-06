@@ -35,8 +35,24 @@ internal class AndroidAmbientLight(context: Context) :
 
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type == Sensor.TYPE_LIGHT) {
-            onLux?.invoke(event.values.firstOrNull() ?: Float.NaN)
+            val lux = event.values.firstOrNull() ?: Float.NaN
+            logLuxThrottled(lux)
+            onLux?.invoke(lux)
         }
+    }
+
+    /** Car-test tuning aid: the real lux profile (daylight vs lit garage) picks the threshold. */
+    private fun logLuxThrottled(lux: Float) {
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastLuxLogAt < LUX_LOG_INTERVAL_MILLIS) return
+        lastLuxLogAt = now
+        DiagnosticSnifferHook.post("Ambient lux=" + "%.1f".format(lux))
+    }
+
+    private var lastLuxLogAt = 0L
+
+    private companion object {
+        const val LUX_LOG_INTERVAL_MILLIS = 5_000L
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
