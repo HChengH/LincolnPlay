@@ -630,7 +630,7 @@
     <string name="car_button_saved_next_connection">Збережено. CarPlay покаже новий значок і назву під час наступного підключення.</string>
     <string name="this_head_unit_has_no_image_picker">На цьому головному пристрої немає вибору зображень.</string>
 </resources>
-<?xml version="1.0" encoding="utf-8"?>
+
 <resources>
     <string name="existing_wifi_title">Наявна Wi-Fi / Одна LAN</string>
     <string name="existing_wifi_description">Використовуйте наявний роутер або портативну Wi-Fi. iPhone та автомобіль залишаються в одній мережі з доступом до Інтернету.</string>
