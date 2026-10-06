@@ -1,8 +1,18 @@
 package com.shilapi.xcertplay.transport
 
+import android.os.Build
 import java.nio.ByteBuffer
 
 internal data class UsbReadQueueResult(val queued: Boolean, val firstBytes: Int, val fallbackBytes: Int? = null)
+
+/**
+ * Android 8.x throws IllegalArgumentException from UsbRequest.queue(ByteBuffer) above 16384
+ * remaining bytes — a throw, not the false return [UsbReadQueuePolicy] adapts to — so every
+ * async read buffer must shrink below that cap before it reaches queue(). Android 9 lifts
+ * the cap entirely. Verified on the SYNC+ board (API 27, 2026-10-05).
+ */
+internal fun usbAsyncQueueChunkBytes(preferredBytes: Int): Int =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) preferredBytes else 16_384
 
 /**
  * A size-compatibility hypothesis for explicit vendor queue rejection, not an API 28 size limit.

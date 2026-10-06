@@ -366,7 +366,7 @@ class Iap2UsbSession internal constructor(
                 )
             }
             initialized = true
-            val buffer = ByteBuffer.allocateDirect(USBMUX_READ_CHUNK_BYTES)
+            val buffer = ByteBuffer.allocateDirect(readChunkBytes())
             val queueResult = synchronized(stateLock) {
                 checkOpenLocked()
                 pendingRead = request
@@ -455,6 +455,8 @@ class Iap2UsbSession internal constructor(
         }
         return error
     }
+
+    private fun readChunkBytes(): Int = usbAsyncQueueChunkBytes(USBMUX_READ_CHUNK_BYTES)
 
     private fun requestDiagnostics(timeoutMillis: Long): String = buildString {
         append("api=").append(Build.VERSION.SDK_INT)
