@@ -1734,6 +1734,15 @@ class CarPlayController(
         if (closed || phase != Phase.IPHONE) return
         val device = iphoneHost.discover().firstOrNull()
         if (device == null) {
+            // The cable really left: the configuration that made the previous attempt
+            // fail went with it, and this iPhone re-attaches exposing a clean one
+            // (verified on the SYNC+ board — it ignores vendor re-enumeration anyway).
+            // Clearing both gates lets a real replug reuse the fresh configuration
+            // directly instead of burning the 8 s re-enumeration dead end twice, as
+            // seen in the 2026-10-07 log: forced transition → attempt hard-failed →
+            // retry forced again → fallback → ~45 s from replug to CarPlay.
+            wiredFailureAt.set(0L)
+            openedWiredDataPaths = false
             onStatus(CarPlayStatus.WaitingForIphone)
             scheduleAvailabilityPoll(Phase.IPHONE, ::checkIphoneAvailability)
         } else {
