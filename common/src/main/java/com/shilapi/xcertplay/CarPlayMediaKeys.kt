@@ -18,6 +18,7 @@ import android.view.KeyEvent
 import androidx.core.graphics.drawable.toBitmap
 import com.shilapi.xcertplay.airplay.CarPlayMediaButton
 import com.shilapi.xcertplay.host.R
+import com.shilapi.xcertplay.hud.BydOutputSettings
 import com.shilapi.xcertplay.media.CarPlayNowPlaying
 import com.shilapi.xcertplay.orchestration.CarPlayController
 import java.util.concurrent.Executors
@@ -204,9 +205,9 @@ internal object CarPlayMediaKeys {
         }
         session = null
         mediaAudioActive = false
+        nowPlaying = CarPlayNowPlaying()
         clusterSong?.release()
         clusterSong = null
-        nowPlaying = CarPlayNowPlaying()
         artwork = null
         artworkCache.clear()
         focusRequest?.let { request -> appContext?.getSystemService(AudioManager::class.java)?.abandonAudioFocusRequest(request) }
@@ -246,10 +247,10 @@ internal object CarPlayMediaKeys {
         Log.i(TAG, "media key $source -> CarPlay $index sent=$sent")
     }
 
-    /** Vendor wheel keys arrive at the window, not the media session; the host activity routes them here. */
-    fun onHardwareMediaKey(index: Int, source: String) = send(index, source)
-
-    private val callback = CarPlayMediaCallback(::send)
+    private val callback = CarPlayMediaCallback(
+        experimentalDiLink3Keys = { appContext?.let(BydOutputSettings::carPlayCallControls) == true },
+        send = ::send,
+    )
 
     /** Whether [next] changes what the media session's metadata shows; position and play state do not. */
     internal fun metadataChanged(previous: CarPlayNowPlaying, next: CarPlayNowPlaying): Boolean =
@@ -327,24 +328,23 @@ internal object CarPlayMediaKeys {
  * Media-session input → CarPlay presses. Hardware keys arrive as button events and keep the toggle;
  * media controllers (not hardware keys) call [onPlay] and [onPause] with an explicit intent.
  */
-internal class CarPlayMediaCallback(private val send: (index: Int, source: String) -> Unit) : MediaSession.Callback() {
-    private fun dispatch(index: Int, source: String) {
-        DiagnosticSnifferHook.post("Media session key: $source")
-        send(index, source)
-    }
-
+internal class CarPlayMediaCallback(
+    private val experimentalDiLink3Keys: () -> Boolean = { false },
+    private val send: (index: Int, source: String) -> Unit,
+) : MediaSession.Callback() {
     override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
         @Suppress("DEPRECATION")
         val event = mediaButtonIntent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT) ?: return false
-        val index = CarPlayMediaButton.forKeyCode(event.keyCode) ?: return super.onMediaButtonEvent(mediaButtonIntent)
+        val index = CarPlayMediaButton.forKeyCode(event.keyCode, experimentalDiLink3Keys())
+            ?: return super.onMediaButtonEvent(mediaButtonIntent)
         if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
-            dispatch(index, KeyEvent.keyCodeToString(event.keyCode))
+            send(index, KeyEvent.keyCodeToString(event.keyCode))
         }
         return true
     }
 
-    override fun onPlay() = dispatch(CarPlayMediaButton.PLAY, "play")
-    override fun onPause() = dispatch(CarPlayMediaButton.PAUSE, "pause")
-    override fun onSkipToNext() = dispatch(CarPlayMediaButton.NEXT, "next")
-    override fun onSkipToPrevious() = dispatch(CarPlayMediaButton.PREVIOUS, "previous")
+    override fun onPlay() = send(CarPlayMediaButton.PLAY, "play")
+    override fun onPause() = send(CarPlayMediaButton.PAUSE, "pause")
+    override fun onSkipToNext() = send(CarPlayMediaButton.NEXT, "next")
+    override fun onSkipToPrevious() = send(CarPlayMediaButton.PREVIOUS, "previous")
 }

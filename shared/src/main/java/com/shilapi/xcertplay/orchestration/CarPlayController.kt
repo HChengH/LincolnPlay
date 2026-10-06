@@ -192,6 +192,7 @@ class CarPlayController(
             } else {
                 IphoneUsbMatcher.appleVendor()
             },
+            onDiagnostic = ::connectionDiagnostic,
         )
     }
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -590,6 +591,23 @@ class CarPlayController(
         val session = activeSession ?: return false
         return try {
             touchExecutor.execute { session.invokeSiri() }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Answers the ringing call on the iPhone (telephony Hook Switch), as the wheel's call button does. */
+    fun answerCall(): Boolean = sendTelephony(TELEPHONY_HOOK_SWITCH)
+
+    /** Ends the current call or declines the ringing one (telephony Drop). */
+    fun endCall(): Boolean = sendTelephony(TELEPHONY_DROP)
+
+    private fun sendTelephony(index: Int): Boolean {
+        if (closed) return false
+        val session = activeSession ?: return false
+        return try {
+            touchExecutor.execute { session.sendTelephony(index) }
             true
         } catch (_: Exception) {
             false
@@ -1326,7 +1344,8 @@ class CarPlayController(
             val bluetoothStarted = System.nanoTime()
             try {
                 connectBluetoothSocket(socket, device.address)
-                connectionDiagnostic("Bluetooth connect completed elapsedMs=${elapsedMillis(bluetoothStarted)}")
+                connectionDiagnostic("Bluetooth connect completed elapsedMs=${elapsedMillis(bluetoothStarted)} " +
+                    "socketReportedConnected=${runCatching { socket.isConnected }.getOrNull() ?: "unknown"}")
             } catch (error: Throwable) {
                 connectionDiagnostic(
                     "Bluetooth connect failed elapsedMs=${elapsedMillis(bluetoothStarted)} " +
@@ -1336,12 +1355,19 @@ class CarPlayController(
                 throw error
             }
             debugLog("wireless RFCOMM connected address=${device.address}")
+            logBluetoothConnectionSnapshot(device, "after-connect")
             if (isStaleWirelessRun(generation)) {
                 return
             }
             val stream = synchronized(wirelessResourceLock) {
                 if (isStaleWirelessRun(generation)) return
-                BluetoothRfcommDuplexStream(socket).also { bluetoothStream = it }
+                try {
+                    BluetoothRfcommDuplexStream(socket, ::connectionDiagnostic).also { bluetoothStream = it }
+                } finally {
+                    // The stream owns the connected socket and also closes it if stream getters
+                    // fail. Do not retain a second socket owner in bootstrap teardown.
+                    if (bluetoothSocket === socket) bluetoothSocket = null
+                }
             }
             val channel = Iap2Session.openWireless(
                 stream,
@@ -1990,7 +2016,7 @@ class CarPlayController(
         )
         val connection = requireUsbManager().openDevice(device)
             ?: throw IphoneUsbException.DeviceUnavailable("Could not open the iPhone NCM connection")
-        return NcmUsbBridge.open(connection, function)
+        return NcmUsbBridge.open(connection, function, onDiagnostic = ::connectionDiagnostic)
     }
 
     private fun runStack(usbSession: Iap2UsbSession, ncm: NcmUsbBridge, generation: Int) {
@@ -2377,11 +2403,20 @@ class CarPlayController(
                 connectionDiagnostic("Bluetooth snapshot point=$point unavailable reason=connect-permission")
                 return
             }
-            val uuids = device.uuids
+            val bondState = device.bondState
+            val bondName = when (bondState) {
+                BluetoothDevice.BOND_NONE -> "NONE"
+                BluetoothDevice.BOND_BONDING -> "BONDING"
+                BluetoothDevice.BOND_BONDED -> "BONDED"
+                else -> "UNKNOWN"
+            }
+            val cachedServices = runCatching { device.uuids }
+            val uuids = cachedServices.getOrNull()
             val service = UUID.fromString(IAP2_IPHONE_UUID)
             connectionDiagnostic(
                 "Bluetooth snapshot point=$point enabled=${bluetoothAdapter?.isEnabled} " +
-                    "bondState=${device.bondState} cachedServiceCount=${uuids?.size ?: "unknown"} " +
+                    "bondState=$bondState bondName=$bondName cachedServicesReadable=${cachedServices.isSuccess} " +
+                    "cachedServiceCount=${uuids?.size ?: "unknown"} " +
                     "cachedIap2Service=${uuids?.any { it.uuid == service } ?: "unknown"}",
             )
         } catch (error: RuntimeException) {
@@ -2764,6 +2799,9 @@ class CarPlayController(
 
     companion object {
         const val CONNECTION_DIAGNOSTIC_PREFIX = "CONNECTION_DIAGNOSTIC"
+        // Indices in the telephony HID report (AirPlayHid.telephonyDescriptor).
+        private const val TELEPHONY_HOOK_SWITCH = 1
+        private const val TELEPHONY_DROP = 3
         private val diagnosticAttempts = AtomicInteger()
         private const val IAP2_IPHONE_UUID = "00000000-deca-fade-deca-deafdecacafe"
         private const val HOTSPOT_START_TIMEOUT_MILLIS = 60_000L

@@ -68,6 +68,7 @@ class IphoneUsbHost(
     private val usbManager: UsbManager,
     private val matcher: IphoneUsbMatcher,
     private val permissionAction: String = "${context.packageName}.IPHONE_USB_PERMISSION",
+    private val onDiagnostic: (String) -> Unit = {},
 ) {
     private val appContext = context.applicationContext
 
@@ -265,7 +266,7 @@ class IphoneUsbHost(
                 throw IphoneUsbException.DeviceUnavailable("Android could not claim USBMUX interface 1")
             }
             claimedInterface = usbMux
-            return Iap2UsbSession(connection, endpoints.first, endpoints.second)
+            return Iap2UsbSession(connection, endpoints.first, endpoints.second, onDiagnostic)
         } catch (error: Throwable) {
             if (claimedInterface != null) connection.releaseInterface(claimedInterface)
             connection.close()
@@ -330,6 +331,7 @@ class Iap2UsbSession internal constructor(
     private val connection: UsbDeviceConnection,
     private val outEndpoint: UsbEndpoint,
     private val inEndpoint: UsbEndpoint,
+    private val onDiagnostic: (String) -> Unit = {},
 ) : Closeable {
     private val stateLock = Any()
     private val readLock = Any()
@@ -337,6 +339,7 @@ class Iap2UsbSession internal constructor(
     private var closed = false
     private var failure: IphoneUsbException? = null
     private var pendingRead: UsbRequest? = null
+    private val readQueuePolicy = UsbReadQueuePolicy()
 
     fun write(data: ByteArray, timeoutMillis: Int) = synchronized(writeLock) {
         checkOpen()
@@ -363,16 +366,25 @@ class Iap2UsbSession internal constructor(
                 )
             }
             initialized = true
-            val buffer = ByteBuffer.allocateDirect(readChunkBytes())
-            // Publish and queue together so close() cannot cancel before the request is queued.
-            synchronized(stateLock) {
+            val buffer = ByteBuffer.allocateDirect(USBMUX_READ_CHUNK_BYTES)
+            val queueResult = synchronized(stateLock) {
                 checkOpenLocked()
                 pendingRead = request
-                if (!request.queue(buffer)) {
-                    throw IphoneUsbException.DeviceUnavailable(
-                        "Android could not queue USBMUX read request (${requestDiagnostics(timeoutMillis, buffer.capacity())})",
-                    )
-                }
+                readQueuePolicy.queue(buffer, ::checkOpenLocked, request::queue)
+            }
+            if (!queueResult.queued) {
+                throw IphoneUsbException.DeviceUnavailable(
+                    "Android could not queue USBMUX read request (${requestDiagnostics(timeoutMillis)} " +
+                        "firstBytes=${queueResult.firstBytes} fallbackBytes=${queueResult.fallbackBytes ?: "not_attempted"})",
+                )
+            }
+            // The policy remembers an accepted fallback, so this event occurs once per pipe.
+            if (queueResult.fallbackBytes != null) runCatching {
+                onDiagnostic(
+                    "USBMUX read queue compatibility fallback api=${Build.VERSION.SDK_INT} " +
+                        "endpoint=${describeUsbEndpoint(inEndpoint)} firstBytes=${queueResult.firstBytes} " +
+                        "fallbackBytes=${queueResult.fallbackBytes}",
+                )
             }
             val completed = try {
                 connection.requestWait(timeoutMillis)
@@ -437,42 +449,17 @@ class Iap2UsbSession internal constructor(
     }
 
     private fun failSession(message: String, cause: Throwable? = null): IphoneUsbException.DeviceUnavailable {
-        // Status logging keeps only .message, so the root cause must be embedded here or the
-        // car-test log shows a bare "USBMUX read failed" with no way to diagnose it.
-        val detailed = if (cause == null) message else "$message: ${describeThrowable(cause)}"
-        val error = IphoneUsbException.DeviceUnavailable(detailed, cause)
+        val error = IphoneUsbException.DeviceUnavailable(message, cause)
         synchronized(stateLock) {
             if (failure == null) failure = error
         }
         return error
     }
 
-    private fun describeThrowable(cause: Throwable): String = buildString {
-        append(cause.javaClass.simpleName)
-        if (!cause.message.isNullOrBlank()) append(": ").append(cause.message)
-        val frames = cause.stackTrace.take(3)
-        if (frames.isNotEmpty()) {
-            append(" @ ")
-            append(frames.joinToString(" <- ") { frame ->
-                "${frame.className.substringAfterLast('.')}.${frame.methodName}:${frame.lineNumber}"
-            })
-        }
-        cause.cause?.let { nested -> append(" | cause: ").append(describeThrowable(nested)) }
-    }
-
-    /**
-     * Android 8.x throws IllegalArgumentException in UsbRequest.queue(ByteBuffer) above 16384
-     * bytes; Android 9+ accepts the full chunk. Bulk-IN reads may return short, so a smaller
-     * chunk is transparent to the framing above.
-     */
-    private fun readChunkBytes(): Int =
-        if (Build.VERSION.SDK_INT >= 28) USBMUX_READ_CHUNK_BYTES else 16_384
-
-    private fun requestDiagnostics(timeoutMillis: Long, bufferBytes: Int? = null): String = buildString {
+    private fun requestDiagnostics(timeoutMillis: Long): String = buildString {
         append("api=").append(Build.VERSION.SDK_INT)
         append(" endpoint=").append(describeUsbEndpoint(inEndpoint))
         append(" timeoutMs=").append(timeoutMillis)
-        if (bufferBytes != null) append(" bufferBytes=").append(bufferBytes)
     }
 
     private companion object {
@@ -481,7 +468,7 @@ class Iap2UsbSession internal constructor(
     }
 }
 
-private fun describeUsbEndpoint(endpoint: UsbEndpoint): String =
+internal fun describeUsbEndpoint(endpoint: UsbEndpoint): String =
     "0x${endpoint.address.toString(16)}(direction=${endpoint.direction}," +
         "type=${endpoint.type},maxPacket=${endpoint.maxPacketSize})"
 
