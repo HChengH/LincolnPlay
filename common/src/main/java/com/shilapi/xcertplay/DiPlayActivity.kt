@@ -275,6 +275,12 @@ class DiPlayActivity : ComponentActivity() {
         startupHotspotCancelled = true
         super.onStop()
         if (!isFinishing && !isChangingConfigurations) CenterMapOverlay.scheduleShow()
+        // While CarPlay runs, this page is a transient stop from the session menu. Left
+        // alive behind the host task it becomes what BACK-to-desktop reveals instead of
+        // the car launcher (moveTaskToBack surfaces the task just below ours). Retire on
+        // stop so the host's back neighbour is always the desktop; settings reopens from
+        // the session menu.
+        if (!isFinishing && !isChangingConfigurations && CarPlayBackgroundSession.hasSession()) finish()
     }
 
     override fun onResume() {

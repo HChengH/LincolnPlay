@@ -337,6 +337,7 @@ class CarPlayHostSettingsTest {
         org.robolectric.shadows.ShadowVpnService.setPrepareResult(null)
         attachController()
         AirPlayPersistence.saveWirelessEnabled(activity, true)
+        AirPlayPersistence.saveLocationReportingEnabled(activity, false)
         invoke("loadPersistedSettings")
         val device = mock(UsbDevice::class.java)
         `when`(device.vendorId).thenReturn(0x05ac)
@@ -355,6 +356,7 @@ class CarPlayHostSettingsTest {
         org.robolectric.shadows.ShadowVpnService.setPrepareResult(Intent("test.VPN_CONSENT"))
         attachController()
         AirPlayPersistence.saveWirelessEnabled(activity, true)
+        AirPlayPersistence.saveLocationReportingEnabled(activity, false)
         invoke("loadPersistedSettings")
         setField("vpnReady", true) // Previously granted permission may have been revoked.
         val device = mock(UsbDevice::class.java)
@@ -375,6 +377,7 @@ class CarPlayHostSettingsTest {
         org.robolectric.shadows.ShadowVpnService.setPrepareResult(null)
         attachController()
         AirPlayPersistence.saveWirelessEnabled(activity, true)
+        AirPlayPersistence.saveLocationReportingEnabled(activity, false)
         invoke("loadPersistedSettings")
         invoke("openSettingsMenu")
         assertTrue(field("menuOpen") as Boolean)
