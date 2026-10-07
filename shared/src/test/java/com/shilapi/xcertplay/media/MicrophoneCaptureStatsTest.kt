@@ -100,7 +100,7 @@ class MicrophoneCaptureStatsTest {
         stats.flush(ended = true)
         MicrophoneCaptureStats.reportStartFailure(privateConfig, SecurityException("PRIVATE_DEVICE_ADDRESS"), reports::add)
         val text = reports.joinToString("\n")
-        assertTrue(text.contains("type=other source=MIC codec=OPUS"))
+        assertTrue(text.contains("type=other source=VOICE_COMMUNICATION codec=OPUS"))
         assertTrue(text.contains("stage=CAPTURE error=IllegalStateException"))
         for (privateValue in listOf("PRIVATE", "secret", "SECRET", "198.51.100.20", "54321", "head=", "payload=", "key=")) {
             assertFalse(privateValue, text.contains(privateValue))
