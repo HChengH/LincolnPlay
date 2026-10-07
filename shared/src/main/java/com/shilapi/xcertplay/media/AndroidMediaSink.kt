@@ -322,7 +322,19 @@ class AndroidMediaSink(
             audioFocusCoordinator.overlay(true)
             applyOverlayGain(true)
         }
-        audioRenderer(id, format).start()
+        val renderer = audioRenderer(id, format)
+        if (mapsToOverlayChannel(format)) {
+            // Duck release keys on the prompt's acoustic silence, not the phone's stream
+            // teardown: the phone trails seconds of silence before tearing down, which made
+            // music return 3-4 s after the last word. Loud audio re-ducks, so segmented
+            // prompts keep their music low across internal pauses.
+            renderer.overlayTracking = true
+            renderer.onOverlaySpeech = { active ->
+                audioFocusCoordinator.overlay(active)
+                applyOverlayGain(active)
+            }
+        }
+        renderer.start()
         if (format.audioType == "media") updateMediaAudio(id, true)
     }
 
@@ -334,8 +346,13 @@ class AndroidMediaSink(
         val renderer = audioRenderers.remove(id)
         val wasOverlay = renderer != null && mapsToOverlayChannel(renderer.format)
         if (wasOverlay) {
+            // Detach the speech tracker first: the teardown path below is the fallback for
+            // streams that end without a quiet tail; the duck it releases must be final.
+            renderer?.overlayTracking = false
+            renderer?.onOverlaySpeech = null
             // Hold the duck until the buffered prompt tail has actually sounded, so the
-            // arrival announcement neither gets clipped nor swelled over.
+            // arrival announcement neither gets clipped nor swelled over — unless the
+            // silence tracker already released it, which makes this a no-op.
             renderer?.onDrained = {
                 audioFocusCoordinator.overlay(false)
                 applyOverlayGain(false)
@@ -1466,6 +1483,7 @@ private class AudioRenderer(
     private fun writePcm(data: ByteArray, offset: Int = 0, length: Int = data.size) {
         val track = track ?: return
         diagnosticStage = "track-write"
+        if (overlayTracking) trackOverlaySpeech(data, offset, length)
         if (!firstPcmLogged && length > 0) {
             firstPcmLogged = true
             Log.i(
@@ -1606,6 +1624,53 @@ private class AudioRenderer(
     private var effectiveGain = 1f // writer-thread owned; ramps toward [gain]
     @Volatile private var drainOnClose = false
 
+    /**
+     * Overlay-speech tracking, enabled only for guidance/Siri renderers. The phone keeps a
+     * prompt stream open with seconds of trailing silence, so keying the duck release on the
+     * stream teardown made music return 3-4 s after the last word. Instead the release waits
+     * only for acoustic silence (hangover below) — the broadcast/VOIP sidechain norm. The
+     * state machine re-ducks on later loud audio, so segmented prompts ("in 300 m ... turn
+     * right") survive their internal pauses.
+     */
+    @Volatile var overlayTracking = false
+    @Volatile var onOverlaySpeech: ((active: Boolean) -> Unit)? = null
+    private var overlayHadLoudAudio = false
+    private var overlayQuietFrames = 0L
+    private var overlaySpeechActive = false
+
+    private fun trackOverlaySpeech(data: ByteArray, offset: Int, length: Int) {
+        var peak = 0
+        var i = offset
+        val end = offset + (length - length % 2)
+        while (i < end) {
+            val sample = (data[i + 1].toInt() shl 8) or (data[i].toInt() and 0xff)
+            val abs = if (sample < 0) -sample else sample
+            if (abs > peak) peak = abs
+            i += 64
+        }
+        when {
+            peak >= OVERLAY_SPEECH_LOUD_PEAK -> {
+                overlayHadLoudAudio = true
+                overlayQuietFrames = 0
+                notifyOverlaySpeech(true)
+            }
+            overlayHadLoudAudio && peak <= OVERLAY_SPEECH_QUIET_PEAK -> {
+                overlayQuietFrames += (length / frameBytes).toLong().coerceAtLeast(1L)
+                if (overlayQuietFrames >= format.sampleRate.toLong() * OVERLAY_SILENCE_EXIT_MILLIS / 1_000) {
+                    notifyOverlaySpeech(false)
+                }
+            }
+            // Between the two thresholds is a hysteresis dead band: hold the current state.
+        }
+    }
+
+    private fun notifyOverlaySpeech(active: Boolean) {
+        if (active == overlaySpeechActive) return
+        overlaySpeechActive = active
+        runCatching { report("Audio: prompt speech active=$active peakTracker=on") }
+        runCatching { onOverlaySpeech?.invoke(active) }
+    }
+
     fun setGain(value: Float) {
         gain = value.coerceIn(0f, 1f)
     }
@@ -1702,6 +1767,12 @@ private class AudioRenderer(
         const val TAG = "xcertplay-usb"
         const val DRAIN_TIMEOUT_NS = 2_000_000_000L
         const val DUCK_EARLY_RELEASE_MILLIS = 400L
+
+        /** Speech detection hysteresis (~-24 dBFS arms, below ~-42 dBFS counts as quiet). */
+        const val OVERLAY_SPEECH_LOUD_PEAK = 2_000
+        const val OVERLAY_SPEECH_QUIET_PEAK = 250
+        /** Broadcast/VOIP hangover: this much confirmed trailing silence releases the duck. */
+        const val OVERLAY_SILENCE_EXIT_MILLIS = 700L
         const val DUCK_RAMP_MILLIS = 120
         const val RECOVER_RAMP_MILLIS = 220
         const val AAC_OBJECT_TYPE_LC = 2
