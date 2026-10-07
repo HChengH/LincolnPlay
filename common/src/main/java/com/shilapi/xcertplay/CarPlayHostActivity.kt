@@ -866,9 +866,20 @@ class CarPlayHostActivity : ComponentActivity() {
         return device?.vendorId == IphoneUsbMatcher.APPLE_VENDOR_ID
     }
 
+    /**
+     * A lost session (cable pull or spontaneous drop) parks the host behind the launcher
+     * instead of sitting on the reconnecting screen: the stack keeps reconnecting via the
+     * background session, and silentConnect brings CarPlay forward again once it is back.
+     */
+    private fun parkBehindLauncherWhileReconnecting() {
+        if (menuOpen || !isActivityStarted || isFinishing) return
+        silentConnect = true
+        moveTaskToBack(true)
+        appendLog("Session lost: parking behind the launcher while reconnecting")
+    }
+
     /** Brings the parked CarPlay task back to the front without recreating the host. */
-    private fun surfaceFromBackground() {
-        if (isFinishing) return
+    private fun surfaceFromBackground() {        if (isFinishing) return
         // CLEAR_TOP drops anything stacked above the host in its own task — DiPlayActivity
         // used to pile up there (showDiPlayHome launched it task-locally), so "front the
         // task" surfaced the settings page instead of CarPlay. The service retry covers
@@ -3973,6 +3984,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     ClusterActivityOutput.setStreamActive(false)
                     setConnectionStage(getString(R.string.carplay_session_ended_reconnecting))
                     appendLog("AirPlay session ended; reconnecting from scratch")
+                    parkBehindLauncherWhileReconnecting()
                     reconnectAfterLoss("AirPlay session ended")
                 }
             }
@@ -3989,6 +4001,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     ClusterActivityOutput.setStreamActive(false)
                     setConnectionStage(getString(R.string.transport_error_reconnecting))
                     appendLog("CarPlay transport error: $message; reconnecting from scratch")
+                    parkBehindLauncherWhileReconnecting()
                     reconnectAfterLoss("CarPlay transport error: $message")
                 }
             }
