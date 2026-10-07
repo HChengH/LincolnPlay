@@ -36,15 +36,16 @@ class LocationReportingSettingsTest {
         controller?.pause()?.stop()?.destroy()
     }
 
-    @Test fun currentSettingsExposeLocationSwitchWithDefaultOff() {
+    @Test fun currentSettingsExposeLocationSwitchWithDefaultOn() {
         openSettings()
 
-        assertFalse(locationSwitch().isChecked)
-        assertFalse(AirPlayPersistence.loadLocationReportingEnabled(context))
+        assertTrue(locationSwitch().isChecked)
+        assertTrue(AirPlayPersistence.loadLocationReportingEnabled(context))
     }
 
     @Test fun grantedSettingSurvivesRecreationAndCanBeDisabled() {
         shadowOf(context).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        AirPlayPersistence.saveLocationReportingEnabled(context, false)
         openSettings()
 
         locationSwitch().performClick()
@@ -58,6 +59,7 @@ class LocationReportingSettingsTest {
     }
 
     @Test fun enablingWaitsForPrecisePermissionAndRejectsApproximateOnly() {
+        AirPlayPersistence.saveLocationReportingEnabled(context, false)
         openSettings()
         locationSwitch().performClick()
 
@@ -75,6 +77,7 @@ class LocationReportingSettingsTest {
     }
 
     @Test fun precisePermissionResultEnablesReporting() {
+        AirPlayPersistence.saveLocationReportingEnabled(context, false)
         openSettings()
         locationSwitch().performClick()
         val request = shadowOf(activity).lastRequestedPermission
@@ -90,6 +93,7 @@ class LocationReportingSettingsTest {
     @Test fun eitherToggleDirectionStopsTheOldSessionAndOpensANewHostWithSavedSetting() {
         shadowOf(context).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
         AirPlayPersistence.saveWirelessEnabled(context, false)
+        AirPlayPersistence.saveLocationReportingEnabled(context, false)
         openSettings()
         // Authentication assets are deliberately absent from unit tests. Model an already
         // provisioned, connected host without constructing transports or native decoders.

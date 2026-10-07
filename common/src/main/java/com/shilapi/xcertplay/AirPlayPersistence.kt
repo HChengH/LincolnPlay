@@ -445,9 +445,11 @@ object AirPlayPersistence {
             .apply()
     }
 
+    /** Default on: inside a wired CarPlay session the iPhone stops using its own GPS, so
+     *  without our reporting Maps and Find-my drift to stale positions. Needs fine location. */
     fun loadLocationReportingEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_LOCATION_REPORTING_ENABLED, false)
+            .getBoolean(KEY_LOCATION_REPORTING_ENABLED, true)
 
     fun saveLocationReportingEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()

@@ -223,10 +223,10 @@ class CarPlayNightModeControllerTest {
         assertTrue(f.controller.night)
     }
 
-    @Test fun preferenceKeysAreStableAndUnknownValuesFollowSystem() {
+    @Test fun preferenceKeysAreStableAndUnknownValuesFollowAmbient() {
         for (mode in CarPlayNightMode.entries) assertEquals(mode, CarPlayNightMode.fromKey(mode.key))
-        assertEquals(CarPlayNightMode.SYSTEM, CarPlayNightMode.fromKey(null))
-        assertEquals(CarPlayNightMode.SYSTEM, CarPlayNightMode.fromKey("future-mode"))
+        assertEquals(CarPlayNightMode.AMBIENT, CarPlayNightMode.fromKey(null))
+        assertEquals(CarPlayNightMode.AMBIENT, CarPlayNightMode.fromKey("future-mode"))
     }
     @Test fun defaultThresholdAndDelayApplyInBothDirections() {
         val f = Fixture()

@@ -8,7 +8,9 @@ enum class CarPlayNightMode(val key: String) {
     NIGHT("night");
 
     companion object {
-        fun fromKey(key: String?): CarPlayNightMode = entries.firstOrNull { it.key == key } ?: SYSTEM
+        // Unset means AMBIENT: this board's system UI mode is permanently night, so SYSTEM
+        // would freeze CarPlay dark; the light sensor is the real signal on this hardware.
+        fun fromKey(key: String?): CarPlayNightMode = entries.firstOrNull { it.key == key } ?: AMBIENT
     }
 }
 
