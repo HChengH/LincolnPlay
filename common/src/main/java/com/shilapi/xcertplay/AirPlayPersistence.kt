@@ -102,7 +102,9 @@ object AirPlayPersistence {
 
     const val DEFAULT_MANUFACTURER = "DiPlay"
     const val DEFAULT_MODEL = "DiPlay"
-    const val DEFAULT_OEM_LABEL = "BYD"
+    // The label under the "back to the car" app on the CarPlay home screen. This port's
+    // target is the Lincoln SYNC+ head unit; saved values still override the default.
+    const val DEFAULT_OEM_LABEL = "SYNC+"
     const val DEFAULT_MFI_I2C_PATH = "/dev/i2c-1"
 
     /** Show the session log on screen while CarPlay is open; used during car tests. */
