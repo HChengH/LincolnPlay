@@ -68,6 +68,9 @@ class CarPlayRuntimeConfig(
     /** Streams the phone's syslog during wired bring-up for protocol diagnosis; costs
      *  ~300 ms and a channel on every connect, so it rides the debug-logs setting. */
     val phoneLogCapture: Boolean = false,
+    /** Per-frame iAP2/USBMUX link traces and raw route dumps; debug-logs only — these
+     *  lines flood the rotating session log at connection rates. */
+    val linkTracing: Boolean = false,
     val wifiP2pPreferredChannel: Int = WifiP2pChannels.AUTO,
     val existingWifiSsid: String = "",
     val existingWifiPassphrase: String = "",

@@ -80,6 +80,7 @@ object BydNavigationOutputs {
      * iOS; a constant wrong arrow with correct distance means this iOS changed it.
      */
     private fun dumpRouteFrame(frame: Iap2Frame) {
+        if (!com.shilapi.xcertplay.orchestration.TransportDiagnostics.verbose) return
         val maneuver = frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE
         val now = System.currentTimeMillis()
         if (!maneuver) {

@@ -160,7 +160,7 @@ class Iap2UsbMuxHost private constructor(
                 receiveFrames.takeFrame()?.let { frame ->
                     // LIVI only trusts the length field on receive: iPhone replies do not
                     // carry the 0xFEEDFACE word in the header's fourth field.
-                    Log.i(
+                    if (com.shilapi.xcertplay.orchestration.TransportDiagnostics.verbose) Log.i(
                         "xcertplay-usb",
                         "usbmux rx proto=${frame.protocol} length=${frame.length} word8=0x" +
                             frame.word8.toUInt().toString(16),
@@ -229,7 +229,7 @@ class Iap2UsbMuxHost private constructor(
             throw IphoneUsbException.Protocol("Invalid USBMUX TCP header length")
         }
         val destinationPort = readU16(frame, offset + 2)
-        if (length == tcpHeaderBytes) Log.i("xcertplay-usb", "usbmux TCP control destination=$destinationPort flags=${frame[13].toInt() and 0xff} ack=${readU32(frame, 8)} window=${readU16(frame, 14)}")
+        if (length == tcpHeaderBytes && com.shilapi.xcertplay.orchestration.TransportDiagnostics.verbose) Log.i("xcertplay-usb", "usbmux TCP control destination=$destinationPort flags=${frame[13].toInt() and 0xff} ack=${readU32(frame, 8)} window=${readU16(frame, 14)}")
         val connection = synchronized(stateLock) { connections[destinationPort] } ?: return
         connection.onPacket(
             flags = frame[offset + 13].toInt() and 0xff,

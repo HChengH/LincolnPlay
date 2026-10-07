@@ -170,6 +170,7 @@ class CarPlayController(
         require(!config.locationReportingEnabled || locationProvider != null) {
             "A location provider is required when location reporting is enabled"
         }
+        TransportDiagnostics.verbose = config.linkTracing
         WifiScanPause.restoreIfNeeded(context.applicationContext)
         BydNavigationOutputs.start(context.applicationContext)
         BydNavigationOutputs.setClusterStreamControl(::applyClusterUi)
@@ -2117,12 +2118,12 @@ class CarPlayController(
                     val started = System.nanoTime()
                     var result = ConnectionIoDiagnostics.Result.FAILED
                     try {
-                        debugLog("wired link TX begin ${wireSummary(data)}")
+                        if (config.linkTracing) debugLog("wired link TX begin ${wireSummary(data)}")
                         // Bound each TLS write while diagnosing the stalled certificate transfer.
                         for (offset in data.indices step 256) {
                             carkit.send(data.copyOfRange(offset, minOf(offset + 256, data.size)))
                         }
-                        debugLog("wired link TX completed bytes=${data.size}")
+                        if (config.linkTracing) debugLog("wired link TX completed bytes=${data.size}")
                         result = ConnectionIoDiagnostics.Result.COMPLETED
                     } finally {
                         io.record(ConnectionIoDiagnostics.Operation.WRITE, result, elapsedMillis(started))
@@ -2138,7 +2139,7 @@ class CarPlayController(
                                 bytes.isEmpty() -> ConnectionIoDiagnostics.Result.ENDED
                                 else -> ConnectionIoDiagnostics.Result.COMPLETED
                             }
-                            if (bytes != null) debugLog("wired link RX ${wireSummary(bytes)}")
+                            if (bytes != null && config.linkTracing) debugLog("wired link RX ${wireSummary(bytes)}")
                         }
                     } finally {
                         io.record(ConnectionIoDiagnostics.Operation.READ, result, elapsedMillis(started))

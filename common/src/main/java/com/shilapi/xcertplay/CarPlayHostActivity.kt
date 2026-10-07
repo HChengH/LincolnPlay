@@ -179,6 +179,7 @@ class CarPlayHostActivity : ComponentActivity() {
         wirelessBluetoothDeviceAddress = DiPlayPreferences.phoneAddress(this),
         transport = if (wirelessEnabled) CarPlayTransport.WIRELESS else CarPlayTransport.WIRED,
         phoneLogCapture = AirPlayPersistence.loadDebugLogsEnabled(this),
+        linkTracing = AirPlayPersistence.loadDebugLogsEnabled(this),
         wirelessHotspotMode = wirelessHotspotMode,
         wifiP2pPreferredChannel = AirPlayPersistence.loadWifiP2pPreferredChannel(this),
         manualHotspotSsid = manualHotspotSsid,
@@ -894,23 +895,19 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     /** Brings the parked CarPlay task back to the front without recreating the host. */
-    private fun surfaceFromBackground() {        if (isFinishing) return
+    private fun surfaceFromBackground() {
+        if (isFinishing) return
         // CLEAR_TOP drops anything stacked above the host in its own task — DiPlayActivity
         // used to pile up there (showDiPlayHome launched it task-locally), so "front the
-        // task" surfaced the settings page instead of CarPlay. The service retry covers
-        // ROMs that drop starts from backgrounded activities; both resolve to the same
-        // singleTask instance.
-        val surface = Intent(this, CarPlayHostActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        val direct = runCatching { startActivity(surface) }
+        // task" surfaced the settings page instead of CarPlay.
+        val direct = runCatching {
+            startActivity(Intent(this, CarPlayHostActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_CLEAR_TOP))
+        }
         appendLog(
             "Silent connect surfacing direct=" + direct.isSuccess +
                 (direct.exceptionOrNull()?.let { " err=${it.javaClass.simpleName}" } ?: ""),
         )
-        runCatching {
-            startForegroundService(Intent(this, DiPlaySessionService::class.java)
-                .setAction(DiPlaySessionService.ACTION_SURFACE_HOST))
-        }.onFailure { appendLog("Surface service dispatch failed: ${it.javaClass.simpleName}") }
     }
 
     override fun onStart() {
