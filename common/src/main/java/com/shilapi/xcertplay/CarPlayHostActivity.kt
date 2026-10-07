@@ -119,6 +119,8 @@ import kotlin.math.roundToInt
  */
 /** Sent by BootReceiver and USB attach to connect without showing any UI until ready. */
 private const val EXTRA_SILENT_CONNECT = "com.shilapi.xcertplay.EXTRA_SILENT_CONNECT"
+/** False until a microphone uplink encoder actually ships; guards the /info input advert. */
+private const val MICROPHONE_UPLINK_READY = false
 
 class CarPlayHostActivity : ComponentActivity() {
     private data class SettingsBaseline(
@@ -3696,7 +3698,12 @@ class CarPlayHostActivity : ComponentActivity() {
             cluster = clusterDisplayConfig(),
             rightHandDrive = rightHandDrive,
             hevc = hevcEnabled,
-            microphone = microphoneAvailable,
+            // Advertising a CarPlay microphone makes iOS route system-wide audio input
+            // (Siri, WeChat/FiShu recordings) to this session — but no uplink encoder
+            // exists yet (no Opus encoder on Android 8; libopus port pending), so every
+            // capture would record silence. The permission alone must never be advertised
+            // as capability. Flip when a real uplink ships.
+            microphone = microphoneAvailable && MICROPHONE_UPLINK_READY,
             manufacturer = normalizedManufacturer(),
             model = normalizedModel(),
             oemLabel = oemLabel,

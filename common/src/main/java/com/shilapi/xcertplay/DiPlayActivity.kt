@@ -228,6 +228,23 @@ class DiPlayActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent); setIntent(intent)
+        // Same router rule as onCreate: the launcher card (no page extra) with a live
+        // session goes straight to CarPlay. This path is the common one — the settings
+        // activity usually stays alive in its task, so card taps land here, not onCreate.
+        if (intent.getStringExtra("page") == null && CarPlayBackgroundSession.hasSession()) {
+            runCatching {
+                startActivity(
+                    Intent(this, CarPlayHostActivity::class.java)
+                        .addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK or
+                                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                                Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                        ),
+                )
+            }
+            finish()
+            return
+        }
         page = intent.getStringExtra("page") ?: "home"; render()
         automaticVehicleValidationStarted = false
         scheduleAutomaticVehicleValidation()
