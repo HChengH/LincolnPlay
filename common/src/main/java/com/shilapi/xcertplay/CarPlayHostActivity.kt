@@ -605,10 +605,10 @@ class CarPlayHostActivity : ComponentActivity() {
                     } else if (menuOpen) {
                         if (safeAreaEditorActive) closeSafeAreaEditor() else cancelSettingsEdits()
                     } else {
-                        // Like native CarPlay: going back to the car backgrounds the whole
-                        // task. The session (audio, USB, navigation) keeps running; tapping
-                        // the CarPlay icon or re-attaching the cable brings it right back.
-                        moveTaskToBack(true)
+                        // Like native CarPlay: going back to the car keeps the session
+                        // (audio, USB, navigation) running; the CarPlay icon or the cable
+                        // brings it right back.
+                        goToCarHome()
                     }
                 }
             },
@@ -842,7 +842,7 @@ class CarPlayHostActivity : ComponentActivity() {
             // while visible: a re-enumeration while CarPlay is on screen must not hide it.
             if (!isActivityStarted && AirPlayPersistence.loadAutoStartOnBoot(this)) {
                 silentConnect = true
-                moveTaskToBack(true)
+                goToCarHome()
                 appendLog("Silent connect: staying behind the launcher while the cable session comes up")
             }
             if (wirelessEnabled) {
@@ -874,8 +874,23 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun parkBehindLauncherWhileReconnecting() {
         if (menuOpen || !isActivityStarted || isFinishing) return
         silentConnect = true
-        moveTaskToBack(true)
-        appendLog("Session lost: parking behind the launcher while reconnecting")
+        goToCarHome()
+        appendLog("Session lost: back on the car home while reconnecting")
+    }
+
+    /**
+     * Deterministic exit to the car's own desktop: moveTaskToBack lands on whatever task
+     * happens to sit directly below ours — on this board that is sometimes the bare
+     * Android launcher (it boots before the car home). Fronting the HOME category always
+     * reveals the default home app, whatever the stack order.
+     */
+    private fun goToCarHome() {
+        if (isFinishing) return
+        val sent = runCatching {
+            startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+        if (sent.isFailure) runCatching { moveTaskToBack(true) }
     }
 
     /** Brings the parked CarPlay task back to the front without recreating the host. */
@@ -3982,9 +3997,9 @@ class CarPlayHostActivity : ComponentActivity() {
                     }
                     activeScreenStreamTypes.clear()
                     ClusterActivityOutput.setStreamActive(false)
+                    parkBehindLauncherWhileReconnecting()
                     setConnectionStage(getString(R.string.carplay_session_ended_reconnecting))
                     appendLog("AirPlay session ended; reconnecting from scratch")
-                    parkBehindLauncherWhileReconnecting()
                     reconnectAfterLoss("AirPlay session ended")
                 }
             }
@@ -3999,9 +4014,9 @@ class CarPlayHostActivity : ComponentActivity() {
                     }
                     activeScreenStreamTypes.clear()
                     ClusterActivityOutput.setStreamActive(false)
+                    parkBehindLauncherWhileReconnecting()
                     setConnectionStage(getString(R.string.transport_error_reconnecting))
                     appendLog("CarPlay transport error: $message; reconnecting from scratch")
-                    parkBehindLauncherWhileReconnecting()
                     reconnectAfterLoss("CarPlay transport error: $message")
                 }
             }
