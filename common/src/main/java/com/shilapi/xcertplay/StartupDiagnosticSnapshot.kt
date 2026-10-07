@@ -19,7 +19,7 @@ internal object StartupDiagnosticSnapshot {
     fun launchResult(context: Context, failure: RuntimeException? = null) {
         runCatching {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putString("launchResult", if (failure == null) "skipped-pre-warm-removed" else "failed")
+                .putString("launchResult", if (failure == null) "startActivity-returned" else "failed")
                 .putString("failureClass", failure?.javaClass?.simpleName?.take(80)
                     ?.replace(Regex("[^A-Za-z0-9_$]"), "?")).apply()
         }
@@ -35,7 +35,7 @@ internal object StartupDiagnosticSnapshot {
                 "launchEnabledAtBoot=${prefs.getBoolean("launchEnabled", false)} " +
                 "launchResult=${prefs.getString("launchResult", "unknown")} " +
                 "failureClass=${prefs.getString("failureClass", "none") ?: "none"}; " +
-                "boot records delivery only; pre-warm was removed (warm-attach bounce)."
+                "the boot launch is silent: success means parked, not displayed."
         }
     }.getOrDefault("Boot diagnostics unavailable.")
 }

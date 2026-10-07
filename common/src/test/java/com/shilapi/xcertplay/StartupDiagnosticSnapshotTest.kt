@@ -20,7 +20,7 @@ class StartupDiagnosticSnapshotTest {
         AirPlayPersistence.saveAutoStartOnBoot(app, false)
     }
 
-    @Test fun disabledBootIsRecordedWithoutLaunchingAnythingOrChangingTheSetting() {
+    @Test fun disabledBootIsRecordedWithoutLaunchingOrChangingTheSetting() {
         var launched = false
         val context = object : ContextWrapper(app) {
             override fun startActivity(intent: Intent) { launched = true }
@@ -32,20 +32,35 @@ class StartupDiagnosticSnapshotTest {
         assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchEnabledAtBoot=false launchResult=disabled"))
     }
 
-    @Test fun bootWithToggleOnRecordsDeliveryButLaunchesNothing() {
-        // Pre-warm was removed: a boot host made the first plug a warm attach that bounced
-        // the task to the front and back before CarPlay. The first plug must stay a cold
-        // silent launch, so boot never starts an activity or service.
+    @Test fun successfulBootSilentlyLaunchesTheHostWithoutAnyService() {
         AirPlayPersistence.saveAutoStartOnBoot(app, true)
-        var launched = false
+        var launch: Intent? = null
+        var serviceStarted = false
         val context = object : ContextWrapper(app) {
-            override fun startActivity(intent: Intent) { launched = true }
-            override fun startForegroundService(service: Intent): android.content.ComponentName? { launched = true; return null }
+            override fun startActivity(intent: Intent) { launch = intent }
+            override fun startForegroundService(service: Intent): android.content.ComponentName? { serviceStarted = true; return null }
         }
         BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
-        assertFalse(launched)
-        assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchEnabledAtBoot=true"))
-        assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=skipped-pre-warm-removed"))
+        assertEquals(CarPlayHostActivity::class.java.name, launch!!.component!!.className)
+        assertTrue(launch!!.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertTrue(launch!!.getBooleanExtra("com.shilapi.xcertplay.EXTRA_SILENT_CONNECT", false))
+        assertFalse(serviceStarted)
+        assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=startActivity-returned"))
+    }
+
+    @Test fun launchFailureRecordsOnlyItsClassAndASecondBootReplacesOldEvidence() {
+        AirPlayPersistence.saveAutoStartOnBoot(app, true)
+        val context = object : ContextWrapper(app) {
+            override fun startActivity(intent: Intent) { throw SecurityException("Jane's phone token=private-data") }
+        }
+        BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
+        val failed = StartupDiagnosticSnapshot.report(app)
+        assertTrue(failed.contains("launchResult=failed failureClass=SecurityException"))
+        assertFalse(failed.contains("Jane")); assertFalse(failed.contains("private-data"))
+        assertNotNull(DiagnosticRedactor.redact(failed))
+        AirPlayPersistence.saveAutoStartOnBoot(app, false)
+        BootReceiver().onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
+        assertTrue(StartupDiagnosticSnapshot.report(app).contains("launchResult=disabled failureClass=none"))
     }
 
     @Test fun unrelatedBroadcastsDoNotCreateOrOverwriteBootEvidence() {
