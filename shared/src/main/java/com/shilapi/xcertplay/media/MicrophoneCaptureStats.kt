@@ -99,12 +99,14 @@ internal class MicrophoneCaptureStats(
         private const val REPORT_INTERVAL_NS = 5_000_000_000L
 
         private fun metadata(config: MicrophoneConfig): String {
-            val (type, source) = when (config.audioType) {
-                "telephony" -> "telephony" to "VOICE_COMMUNICATION"
-                "speechrecognition" -> "speechrecognition" to "VOICE_RECOGNITION"
-                else -> "other" to "MIC"
+            // The capture source is unified (see MicrophoneUplink): the board's mic only
+            // routes through the voice-DSP path that VOICE_COMMUNICATION holds open.
+            val type = when (config.audioType) {
+                "telephony" -> "telephony"
+                "speechrecognition" -> "speechrecognition"
+                else -> "other"
             }
-            return "type=$type source=$source codec=${config.codec.name} " +
+            return "type=$type source=VOICE_COMMUNICATION codec=${config.codec.name} " +
                 "rate=${config.sampleRate} channels=${config.channels} frameMs=${config.frameMillis}"
         }
 
