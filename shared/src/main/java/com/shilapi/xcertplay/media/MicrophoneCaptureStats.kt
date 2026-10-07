@@ -28,6 +28,11 @@ internal class MicrophoneCaptureStats(
     private var lastSentNs: Long? = null
     private var sendGapMaxNs = 0L
     private var routedDeviceType: Int? = null
+    private var windowPeakAbs = 0
+
+    fun level(absPeak: Int) {
+        if (absPeak > windowPeakAbs) windowPeakAbs = absPeak
+    }
 
     fun started(routeType: Int?) {
         routedDeviceType = routeType
@@ -70,7 +75,8 @@ internal class MicrophoneCaptureStats(
         if (routeType != null) routedDeviceType = runCatching { routeType() }.getOrNull()
         emit("Microphone: stats $metadata routedDeviceType=${routedDeviceType ?: "unknown"} " +
             "captureBytes=$capturedBytes reads=$reads zeroReads=$zeroReads readErrors=$readErrors " +
-            "readMaxMs=${readMaxNs / 1_000_000} encodedFrames=$encodedFrames " +
+            "readMaxMs=${readMaxNs / 1_000_000} peakAbs=$windowPeakAbs " +
+            "encodedFrames=$encodedFrames " +
             "emptyEncodedFrames=$emptyEncodedFrames udpSent=$udpSent sendErrors=$sendErrors " +
             "sendGapMaxMs=${sendGapMaxNs / 1_000_000} ended=$ended")
         windowStart = now
@@ -79,6 +85,7 @@ internal class MicrophoneCaptureStats(
         zeroReads = 0
         readErrors = 0
         readMaxNs = 0
+        windowPeakAbs = 0
         encodedFrames = 0
         emptyEncodedFrames = 0
         udpSent = 0

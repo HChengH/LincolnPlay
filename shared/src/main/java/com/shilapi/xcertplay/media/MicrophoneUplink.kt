@@ -59,11 +59,12 @@ internal class MicrophoneUplink(
             return false
         }
 
-        val source = when (config.audioType) {
-            "telephony" -> MediaRecorder.AudioSource.VOICE_COMMUNICATION
-            "speechrecognition" -> MediaRecorder.AudioSource.VOICE_RECOGNITION
-            else -> MediaRecorder.AudioSource.MIC
-        }
+        // Always VOICE_COMMUNICATION: on this board the physical mic lives on the voice DSP
+        // path and only routes to Android capture while that path is held — the factory
+        // voice assistant opening it made our capture hear real audio (user-verified), and
+        // MIC/VOICE_RECOGNITION sources capture dead silence otherwise. VOICE_COMMUNICATION
+        // is the source the policy ties to that path, with AEC/NS as a side benefit.
+        val source = MediaRecorder.AudioSource.VOICE_COMMUNICATION
         val nextEncoder = if (config.codec == AudioCodecKind.OPUS) {
             OpusEncoder(config.bitrate ?: 48_000).takeIf { it.available }
         } else {
@@ -225,6 +226,7 @@ internal class MicrophoneUplink(
     }
 
     private fun sendFrame(socket: DatagramSocket, counters: MicrophoneCounters, frame: ByteArray) {
+        stats.level(framePeak(frame))
         val bodies = if (config.codec == AudioCodecKind.OPUS) {
             opusEncoder?.encode(frame).orEmpty()
         } else {
@@ -239,6 +241,19 @@ internal class MicrophoneUplink(
                 samples = config.rtpSamplesPerPacket,
             )
         }
+    }
+
+    /** Max |sample| across the frame (16-bit LE, strided); distinguishes routed audio from silence. */
+    private fun framePeak(frame: ByteArray): Int {
+        var peak = 0
+        var i = 0
+        while (i + 1 < frame.size) {
+            val sample = (frame[i + 1].toInt() shl 8) or (frame[i].toInt() and 0xff)
+            val abs = if (sample < 0) -sample else sample
+            if (abs > peak) peak = abs
+            i += 32
+        }
+        return peak
     }
 
     private fun sendPacket(
