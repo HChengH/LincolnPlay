@@ -25,6 +25,10 @@ class Iap2WiredControlClient(
         endpoint: Iap2WiredCarPlayEndpoint,
         availableCurrentMilliAmps: Int,
         timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS,
+        /** Grace before the first 0x4301: lets the NCM link's IPv6 ND/DAD settle so the
+         *  phone resolves our link-local endpoint on its first probe instead of a
+         *  retransmit backoff. Zero on fresh pairings - the pairing dance already waits. */
+        sessionStartDelayMillis: Long = 0,
         locationProvider: Iap2LocationProvider? = null,
         vehicleStatusProvider: VehicleStatusProvider? = null,
         onIncoming: (Iap2Frame) -> Unit = {},
@@ -95,6 +99,11 @@ class Iap2WiredControlClient(
                         onProgress(carPlayAvailabilitySummary(incoming.payload))
                         // LIVI sends its wired answer on every availability notification; do not gate it on
                         // the phone's advertised availability boolean.
+                        if (carPlayStartSessions == 0 && sessionStartDelayMillis > 0) {
+                            onProgress("iap2 deferring 0x4301 ${sessionStartDelayMillis}ms for link-local ND/DAD")
+                            runCatching { Thread.sleep(sessionStartDelayMillis) }
+                                .onFailure { return Iap2WiredControlResult(Iap2WiredControlTerminal.CHANNEL_CLOSED, stage, forwardedFrames, carPlayStartSessions) }
+                        }
                         send(carPlayStartSession(endpoint), deadlineNanos)
                         stage = Iap2WiredControlStage.CARPLAY_START_SENT
                         carPlayStartSessions++

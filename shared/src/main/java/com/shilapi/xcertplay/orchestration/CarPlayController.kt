@@ -2191,6 +2191,10 @@ class CarPlayController(
                 endpoint = endpoint,
                 availableCurrentMilliAmps = config.availableCurrentMilliAmps,
                 timeoutMillis = controlLoopTimeoutMillis(),
+                // Reused pairings reach start-session ~2 s after NCM attach, while the
+                // phone is still settling its link-local ND/DAD - the observed 6-10 s
+                // second-connect gap. First pairings already wait out the pairing dance.
+                sessionStartDelayMillis = if (savedPairRecord != null) WIRED_SESSION_START_DELAY_MILLIS else 0L,
                 locationProvider = locationProvider,
                 vehicleStatusProvider = vehicleStatusProvider,
                 onIncoming = ::onRouteFrame,
@@ -2854,6 +2858,8 @@ class CarPlayController(
         private const val REENUMERATION_POLL_INTERVAL_MILLIS = 400L
         private const val REENUMERATION_FALLBACK_MILLIS = 8_000L
         private const val FORCE_REENUMERATION_AFTER_FAILURE_MILLIS = 60_000L
+        /** Grace for link-local ND/DAD before the reused-pairing start-session. */
+        private const val WIRED_SESSION_START_DELAY_MILLIS = 3_500L
         private const val WIRED_SESSION_WATCHDOG_MILLIS = 20_000L
         private val wiredFailureAt = AtomicLong(0)
         private val wiredSessionWatchdogSeen = AtomicBoolean(false)
