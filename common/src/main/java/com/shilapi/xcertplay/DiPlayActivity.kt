@@ -88,6 +88,8 @@ class DiPlayActivity : ComponentActivity() {
     private var testToneTrack: AudioTrack? = null
     private var toneStop: Runnable? = null
     private var exportButton: Button? = null
+    /** True while an activity-result overlay (document/icon picker) covers us. */
+    private var awaitingActivityResult = false
     private var rootScroll: ScrollView? = null
     private var renderedPage: String? = null
     private var pendingScrollY: Int? = null
@@ -279,11 +281,15 @@ class DiPlayActivity : ComponentActivity() {
         // alive behind the host task it becomes what BACK-to-desktop reveals instead of
         // the car launcher (moveTaskToBack surfaces the task just below ours). Retire on
         // stop so the host's back neighbour is always the desktop; settings reopens from
-        // the session menu.
-        if (!isFinishing && !isChangingConfigurations && CarPlayBackgroundSession.hasSession()) finish()
+        // the session menu. Never while an activity-result overlay (report destination,
+        // icon picker) is out: covering us must not kill our result target.
+        if (!isFinishing && !isChangingConfigurations && !awaitingActivityResult &&
+            CarPlayBackgroundSession.hasSession()
+        ) finish()
     }
 
     override fun onResume() {
+        awaitingActivityResult = false
         super.onResume()
         if (Build.VERSION.SDK_INT < 33 && AppLocale.preference(this) != languagePreferenceAtCreate) {
             recreate()
@@ -2843,7 +2849,7 @@ class DiPlayActivity : ComponentActivity() {
         preview.addView(text, LinearLayout.LayoutParams(0, -2, 1f))
         parent.addView(preview)
         parent.addView(button(getString(R.string.choose_image), false) {
-            runCatching { iconPicker.launch("image/*") }.onFailure { toast(getString(R.string.this_head_unit_has_no_image_picker)) }
+            runCatching { iconPicker.launch("image/*").also { awaitingActivityResult = true } }.onFailure { awaitingActivityResult = false; toast(getString(R.string.this_head_unit_has_no_image_picker)) }
         }, matchButton(16, 60))
         if (custom != null) parent.addView(button(getString(R.string.default_icon), false) {
             AirPlayPersistence.clearCustomAirPlayIcon(this)
@@ -3043,7 +3049,8 @@ class DiPlayActivity : ComponentActivity() {
         // Some head units omit or disable DocumentsUI. Launch itself can throw, before
         // the result callback and the background writer's exception handler ever run.
         if (exportInProgress) return
-        runCatching { export.launch(reportFileName()) }.onFailure { exportDiagnostics() }
+        awaitingActivityResult = true
+        runCatching { export.launch(reportFileName()) }.onFailure { awaitingActivityResult = false; exportDiagnostics() }
     }
 
     private fun exportDiagnostics(uri: Uri? = null) {
