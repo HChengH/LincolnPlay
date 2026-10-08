@@ -131,6 +131,7 @@ internal class MicrophoneUplink(
             nextRecorder.startRecording()
             stats.started(routeType(nextRecorder))
             stats.inputDevices(inputDeviceList())
+            gateKeeper = openGateKeeper()
             thread = Thread({ capture(nextRecorder, nextSocket) }, "carplay-mic").apply {
                 isDaemon = true
                 start()
@@ -216,6 +217,7 @@ internal class MicrophoneUplink(
                         filled = 0
                     }
                 }
+                feedGateKeeper(count)
                 stats.flush(routeType = routeInfo)
             }
         } catch (error: Exception) {
@@ -295,6 +297,67 @@ internal class MicrophoneUplink(
         }
     }.getOrDefault(emptyList())
 
+    /**
+     * The board's mic DSP gate follows the OUTPUT side's audio scene: real mic audio only
+     * reaches captures while a MEDIA-usage output stream is (or was recently) playing, and
+     * a speech stream tears that state down (user-verified: record after music works,
+     * after voice playback it dies, music again revives it). A silent MEDIA track held
+     * for the whole capture pins the scene open; it also keeps the output path alive so
+     * Siri's reply stays audible. Zeros only - inaudible and outside the renderer map,
+     * so ducking and media accounting are untouched.
+     */
+    @Volatile private var gateKeeper: android.media.AudioTrack? = null
+    private val gateKeeperSilence = ByteArray(4_096)
+
+    private fun openGateKeeper(): android.media.AudioTrack? = runCatching {
+        val attributes = android.media.AudioAttributes.Builder()
+            .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+            .build()
+        val format = android.media.AudioFormat.Builder()
+            .setEncoding(android.media.AudioFormat.ENCODING_PCM_16BIT)
+            .setSampleRate(GATE_KEEPER_RATE)
+            .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_MONO)
+            .build()
+        val minBuffer = android.media.AudioTrack.getMinBufferSize(
+            GATE_KEEPER_RATE, android.media.AudioFormat.CHANNEL_OUT_MONO,
+            android.media.AudioFormat.ENCODING_PCM_16BIT,
+        ).coerceAtLeast(4_096)
+        android.media.AudioTrack(attributes, format, minBuffer * 2,
+            android.media.AudioTrack.MODE_STREAM, 0).also { track ->
+            track.play()
+            Log.i(TAG, "mic gate-keeper MEDIA track opened rate=$GATE_KEEPER_RATE")
+        }
+    }.onFailure {
+        Log.w(TAG, "mic gate-keeper track unavailable", it)
+    }.getOrNull()
+
+    /** Paces silence onto the keeper at real time, scaled from the capture rate. */
+    private fun feedGateKeeper(capturedBytes: Int) {
+        val track = gateKeeper ?: return
+        runCatching {
+            val bytes = capturedBytes * GATE_KEEPER_RATE / config.sampleRate.coerceAtLeast(1)
+            var written = 0
+            while (written < bytes) {
+                val chunk = minOf(gateKeeperSilence.size, bytes - written)
+                val result = track.write(gateKeeperSilence, 0, chunk, android.media.AudioTrack.WRITE_BLOCKING)
+                if (result <= 0) break
+                written += result
+            }
+        }
+    }
+
+    private fun closeGateKeeper() {
+        val track = gateKeeper ?: return
+        gateKeeper = null
+        runCatching {
+            track.stop()
+        }
+        runCatching {
+            track.release()
+        }
+    }
+
     override fun close() {
         if (!running.compareAndSet(true, false)) {
             release()
@@ -324,6 +387,7 @@ internal class MicrophoneUplink(
     @Synchronized
     private fun release() {
         running.set(false)
+        closeGateKeeper()
         val currentEffects = effects
         effects = emptyList()
         currentEffects.forEach(::releaseEffect)
@@ -350,5 +414,6 @@ internal class MicrophoneUplink(
         const val TAG = "xcertplay-usb"
         const val MIN_READ_BYTES = 2_048
         const val CLOSE_JOIN_MILLIS = 500L
+        const val GATE_KEEPER_RATE = 48_000
     }
 }
