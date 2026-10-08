@@ -101,8 +101,8 @@ object AirPlayPersistence {
     private const val SAFE_AREA_KEY_PREFIX = "safe_area_"
     private const val CUSTOM_ICON_FILE = "airplay-icon.png"
 
-    const val DEFAULT_MANUFACTURER = "DiPlay"
-    const val DEFAULT_MODEL = "DiPlay"
+    const val DEFAULT_MANUFACTURER = "Lincoln"
+    const val DEFAULT_MODEL = "LincolnPlay"
     // The label under the "back to the car" app on the CarPlay home screen. This port's
     // target is the Lincoln SYNC+ head unit; saved values still override the default.
     const val DEFAULT_OEM_LABEL = "SYNC+"
