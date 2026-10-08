@@ -14,7 +14,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.shihab.diplay"
+        applicationId = "com.lincoln.lincolnplay"
         minSdk = 26
         targetSdk = 37
         versionCode = 32
@@ -39,7 +39,6 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".hudtest"
             versionNameSuffix = "-lincoln"
         }
         release {
