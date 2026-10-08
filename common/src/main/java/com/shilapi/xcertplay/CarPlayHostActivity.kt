@@ -619,20 +619,17 @@ class CarPlayHostActivity : ComponentActivity() {
             "Host started; MFI target=${mfiTargetLabel(mfiTarget)}; " +
                 "transport=${if (wirelessEnabled) "wireless" else "wired"}",
         )
-        // The USB attach cold launch goes silent whenever the native CarPlay toggle is
-        // on: the system launched us from the cable event, nothing was tapped. Connect
-        // behind the launcher and surface only when the AirPlay session is active — the
-        // user's launcher, radio or navigation stays on top and fully interactive until
-        // then. The theme's windowDisablePreview plus parking the task here, before the
-        // window is ever added, is what makes the launch invisible. (Boot launches us
-        // this way too, so permissions, VPN consent and the USB controller are all
-        // ready before the cable arrives.) Permission dialogs are intentionally NOT
-        // suppressed: a dialog that appears here means the user never granted it, and
-        // letting it ask in the open beats failing quietly.
+        // A USB attach launch always connects silently: it is the system reacting to the
+        // cable, never a user tap, so the desktop stays until CarPlay is ready (the
+        // user's core vision; the boot toggle only controls boot pre-warming now).
+        // Connect behind the launcher — the theme's windowDisablePreview plus parking
+        // the task here, before the window is ever added, is what makes the launch
+        // invisible. Manual opens carry no attach action and stay visible. Permission
+        // dialogs are intentionally NOT suppressed: a dialog that appears here means
+        // the user never granted it, and letting it ask in the open beats failing quietly.
         val launchIntent = intent
         silentConnect = (launchIntent?.getBooleanExtra(EXTRA_SILENT_CONNECT, false) ?: false) ||
-            (launchIntent != null && isIphoneUsbAttachment(launchIntent) &&
-                AirPlayPersistence.loadAutoStartOnBoot(this))
+            (launchIntent != null && isIphoneUsbAttachment(launchIntent))
         if (silentConnect && !isFinishing) {
             moveTaskToBack(true)
             appendLog("Silent connect: staying behind the launcher until CarPlay is ready")
@@ -841,7 +838,7 @@ class CarPlayHostActivity : ComponentActivity() {
             // Park it again before the window draws (the same zero-flash contract as
             // the cold launch) and surface when the session is actually active. Skipped
             // while visible: a re-enumeration while CarPlay is on screen must not hide it.
-            if (!isActivityStarted && AirPlayPersistence.loadAutoStartOnBoot(this)) {
+            if (!isActivityStarted) {
                 silentConnect = true
                 goToCarHome()
                 appendLog("Silent connect: staying behind the launcher while the cable session comes up")
