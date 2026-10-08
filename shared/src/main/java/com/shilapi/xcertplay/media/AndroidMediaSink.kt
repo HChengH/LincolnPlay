@@ -194,6 +194,7 @@ class AndroidMediaSink(
         { AudioAttributes.USAGE_MEDIA to AudioAttributes.CONTENT_TYPE_MUSIC },
 ) : MediaSink {
     private val appContext = context?.applicationContext
+    private val sinkContext: Context? = context
     private val audioManager = appContext?.getSystemService(AudioManager::class.java)
     private val audioFocusCoordinator = AudioFocusCoordinator(
         appContext,
@@ -405,8 +406,11 @@ class AndroidMediaSink(
     override fun onMicrophoneStarted(id: AudioStreamId, config: MicrophoneConfig) {
         // This callback runs on the downlink thread; microphone failures must not stop playback.
         try {
+            val deviceContext = (appContext ?: sinkContext) ?: return
             if (config.audioType == "telephony") enterCommunicationMode(id)
-            val uplink = microphoneUplinks.computeIfAbsent(id) { MicrophoneUplink(config, onAudioDiagnostic) }
+            val uplink = microphoneUplinks.computeIfAbsent(id) {
+                MicrophoneUplink(deviceContext, config, onAudioDiagnostic)
+            }
             if (!uplink.start()) {
                 microphoneUplinks.remove(id, uplink)
                 restoreAudioMode(id)

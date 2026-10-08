@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * the first downlink audio packet and close it on stream teardown.
  */
 internal class MicrophoneUplink(
+    private val context: android.content.Context,
     private val config: MicrophoneConfig,
     private val onDiagnostic: (String) -> Unit = {},
 ) : Closeable {
@@ -123,9 +124,13 @@ internal class MicrophoneUplink(
         socket = nextSocket
         opusEncoder = nextEncoder
         return try {
-            if (config.audioType == "telephony") effects = voiceEffects(nextRecorder.audioSessionId)
+            // Vendor voice DSP gate: on this board the builtin mic delivers digital
+            // silence to plain captures; the AEC/NS chain (and the vendor voice app)
+            // opens the DSP path. Attach for every uplink as the probe experiment.
+            effects = voiceEffects(nextRecorder.audioSessionId)
             nextRecorder.startRecording()
             stats.started(routeType(nextRecorder))
+            stats.inputDevices(inputDeviceList())
             thread = Thread({ capture(nextRecorder, nextSocket) }, "carplay-mic").apply {
                 isDaemon = true
                 start()
@@ -279,6 +284,16 @@ internal class MicrophoneUplink(
     }
 
     private fun routeType(recorder: AudioRecord): Int? = runCatching { recorder.routedDevice?.type }.getOrNull()
+
+    /** Names every input device the audio manager knows about, for the routing probe. */
+    private fun inputDeviceList(): List<String> = runCatching {
+        val am = context.getSystemService(android.media.AudioManager::class.java) ?: return emptyList()
+        val devices = am.getDevices(android.media.AudioManager.GET_DEVICES_INPUTS)
+        if (devices.isEmpty()) return emptyList()
+        devices.map { device ->
+            "type=${device.type}${device.address?.takeIf { it.isNotBlank() }?.let { " addr=$it" } ?: ""}"
+        }
+    }.getOrDefault(emptyList())
 
     override fun close() {
         if (!running.compareAndSet(true, false)) {

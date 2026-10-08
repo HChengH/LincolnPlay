@@ -39,6 +39,11 @@ internal class MicrophoneCaptureStats(
         emit("Microphone: start $metadata routedDeviceType=${routeType ?: "unknown"}")
     }
 
+    /** All audio input devices on the board, for the mic-routing probe. */
+    fun inputDevices(names: List<String>) {
+        emit("Microphone: inputDevices ${if (names.isEmpty()) "none" else names.joinToString(" | ")}")
+    }
+
     fun reading() { readStart = nowNs() }
 
     fun read(count: Int) {
