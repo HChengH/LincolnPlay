@@ -1772,9 +1772,11 @@ private class AudioRenderer(
         const val OVERLAY_SPEECH_LOUD_PEAK = 2_000
         const val OVERLAY_SPEECH_QUIET_PEAK = 250
         /** Broadcast/VOIP hangover: this much confirmed trailing silence releases the duck. */
-        const val OVERLAY_SILENCE_EXIT_MILLIS = 700L
+        // Tuned on the car 2026-10-08: 1 s hangover (segmented-prompt safety), 500 ms
+        // recovery ramp (user felt 220 ms rose too abruptly for a 1.4 s total recovery).
+        const val OVERLAY_SILENCE_EXIT_MILLIS = 1_000L
         const val DUCK_RAMP_MILLIS = 120
-        const val RECOVER_RAMP_MILLIS = 220
+        const val RECOVER_RAMP_MILLIS = 500
         const val AAC_OBJECT_TYPE_LC = 2
         const val MIN_OPUS_PACKET_BYTES = 4
         const val OPUS_CODEC_DELAY_NANOS = 6_500_000L
