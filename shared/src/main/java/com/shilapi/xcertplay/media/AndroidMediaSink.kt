@@ -407,7 +407,11 @@ class AndroidMediaSink(
         // This callback runs on the downlink thread; microphone failures must not stop playback.
         try {
             val deviceContext = (appContext ?: sinkContext) ?: return
-            if (config.audioType == "telephony") enterCommunicationMode(id)
+            // Every uplink gets the telephony treatment: the phone labels recordings
+            // "speechrecognition" and only real calls "telephony", but the board's vendor
+            // mic DSP respects the communication mode - the last Android-level lever for
+            // opening it (inputDevices shows a single gated builtin mic, AEC alone did not).
+            enterCommunicationMode(id)
             val uplink = microphoneUplinks.computeIfAbsent(id) {
                 MicrophoneUplink(deviceContext, config, onAudioDiagnostic)
             }
@@ -438,7 +442,7 @@ class AndroidMediaSink(
             savedAudioMode = manager.mode
             manager.mode = AudioManager.MODE_IN_COMMUNICATION
             communicationModeStream = id
-            Log.i("xcertplay-usb", "audio mode $savedAudioMode -> ${manager.mode} for telephony stream=$id")
+            Log.i("xcertplay-usb", "audio mode $savedAudioMode -> ${manager.mode} for uplink stream=$id")
         }
     }
 
