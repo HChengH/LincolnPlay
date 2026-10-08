@@ -152,8 +152,10 @@ object AirPlayInfoPlist {
         return listOf(
             format(100, "compatibility", pcm, pcmInput),
             format(101, "compatibility", pcm),
-            format(100, "default", pcmWide or opus, wirelessInput),
-            format(100, "alert", pcmWide or opus),
+            // Prompts advertise wideband LPCM only (no Opus): iOS picks per session and an
+            // Opus turn made navigation voices subtly duller than the verified LPCM ones.
+            format(100, "default", pcmWide, wirelessInput),
+            format(100, "alert", pcmWide),
             format(100, "media", pcm),
             format(100, "telephony", pcmMono or opus, wirelessInput),
             format(100, "speechRecognition", pcmMono or opus, wirelessInput),
