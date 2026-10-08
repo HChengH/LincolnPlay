@@ -6,4 +6,9 @@
     <string name="ambient_light_threshold_hint">自动模式：低于门槛切换夜间，达到或超过门槛切换日间。读数须持续在门槛另一侧达到设定延迟。请输入 1–200000 的整数。</string>
     <string name="ambient_light_threshold_error">请输入 1–200000 的整数。</string>
     <string name="ambient_light_reset_defaults">恢复默认值</string>
+    <string name="ambient_day_factor_title">环境光昼间倍率</string>
+    <string name="ambient_day_factor_value">昼间倍率（x 夜间阈值）</string>
+    <string name="ambient_day_factor_hint">光照超过夜间阈值这个倍数才回昼间。调小滞回带变窄（黄昏切换更快），调大更稳。范围 1.1-4.0，默认 2。</string>
+    <string name="ambient_day_factor_summary">x%s</string>
+    <string name="ambient_day_factor_error">请输入 1.1 到 4.0 之间的值</string>
 </resources>

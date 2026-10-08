@@ -74,7 +74,7 @@ class CarPlayNightModeControllerTest {
     }
 
     @Test fun headlampBandHoldsTheCurrentStateBetweenThresholds() {
-        // Threshold 50: night below 50, day above 125 (2.5x), the band in between holds.
+        // Threshold 50: night below 50, day above 100 (2x), the band in between holds.
         val f = Fixture(true)
         f.light.emit(60f)
         f.clock.advance(10_000)

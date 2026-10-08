@@ -6,4 +6,9 @@
     <string name="ambient_light_threshold_hint">Automatic mode: below the threshold selects night; at or above it selects day. Readings must stay on the new side for the selected delay. Enter an integer from 1 to 200000.</string>
     <string name="ambient_light_threshold_error">Enter an integer from 1 to 200000.</string>
     <string name="ambient_light_reset_defaults">Reset default</string>
+    <string name="ambient_day_factor_title">Ambient day factor</string>
+    <string name="ambient_day_factor_value">Day factor (× the night threshold)</string>
+    <string name="ambient_day_factor_hint">Day returns only above this multiple of the night threshold. Smaller narrows the hold band (faster dusk switching), larger widens it. 1.1-4.0, default 2.</string>
+    <string name="ambient_day_factor_summary">x%s</string>
+    <string name="ambient_day_factor_error">Enter a value between 1.1 and 4.0</string>
 </resources>

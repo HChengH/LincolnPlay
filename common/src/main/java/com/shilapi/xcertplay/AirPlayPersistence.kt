@@ -63,6 +63,7 @@ object AirPlayPersistence {
     private const val KEY_OEM_LABEL = "oem_label"
     private const val KEY_CARPLAY_NIGHT_MODE = "carplay_night_mode"
     private const val KEY_AMBIENT_LUX_THRESHOLD = "ambient_lux_threshold"
+    private const val KEY_AMBIENT_DAY_FACTOR = "ambient_day_factor"
     private const val KEY_FPS = "display_fps"
     private const val KEY_MEDIA_BUFFER_MS = "media_buffer_ms"
     private const val KEY_MAIN_BUFFERED_AUDIO = "main_buffered_audio"
@@ -498,11 +499,22 @@ object AirPlayPersistence {
     fun loadAmbientLightThreshold(context: Context): AmbientLightThreshold = AmbientLightThreshold.fromStored(
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getInt(KEY_AMBIENT_LUX_THRESHOLD, AmbientLightThreshold.DEFAULT_LUX),
+        loadAmbientDayFactor(context),
     )
 
     fun saveAmbientLightThreshold(context: Context, threshold: AmbientLightThreshold) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_AMBIENT_LUX_THRESHOLD, threshold.lux).apply()
+    }
+
+    /** Day returns only above this multiple of the night threshold; tunable dusk-crossing width. */
+    fun loadAmbientDayFactor(context: Context): Float =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getFloat(KEY_AMBIENT_DAY_FACTOR, AmbientLightThreshold.DEFAULT_DAY_FACTOR)
+
+    fun saveAmbientDayFactor(context: Context, dayFactor: Float) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putFloat(KEY_AMBIENT_DAY_FACTOR, dayFactor).apply()
     }
 
     fun loadCarPlayNightMode(context: Context): CarPlayNightMode = CarPlayNightMode.fromKey(

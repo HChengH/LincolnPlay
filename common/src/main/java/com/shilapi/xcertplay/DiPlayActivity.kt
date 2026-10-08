@@ -620,6 +620,7 @@ class DiPlayActivity : ComponentActivity() {
                 setPadding(0, 0, 0, dp(18))
             })
             ambientLightThresholdControl(ambientControls)
+            ambientDayFactorControl(ambientControls)
             nightDelaySettingControl(ambientControls, R.string.ambient_delay_title, R.string.ambient_delay_hint,
                 0..60, 2, R.string.ambient_delay_summary, { AirPlayPersistence.loadAmbientDelaySeconds(this) },
                 save = { AirPlayPersistence.saveAmbientDelaySeconds(this, it) })
@@ -2672,6 +2673,54 @@ class DiPlayActivity : ComponentActivity() {
                 }
                 dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
                     input.setText(default.toString())
+                    input.error = null
+                }
+            }
+            showNightModeSettingsDialog(dialog, fields)
+        }
+        parent.addView(control, matchButton(0, 60))
+        parent.addView(space(12))
+    }
+
+    private fun ambientDayFactorControl(parent: LinearLayout) {
+        val title = getString(R.string.ambient_day_factor_title)
+        fun summary(): String = getString(
+            R.string.contrib_audio_home_choice_summary,
+            title,
+            getString(R.string.ambient_day_factor_summary, AirPlayPersistence.loadAmbientDayFactor(this)),
+        )
+        val control = button(summary(), false) {}
+        control.setOnClickListener {
+            val fields = column().apply { setPadding(dp(24), dp(8), dp(24), dp(8)) }
+            fields.addView(label(getString(R.string.ambient_day_factor_value), 16, MUTED))
+            val input = EditText(this).apply {
+                setSingleLine()
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                    android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                setText(AirPlayPersistence.loadAmbientDayFactor(this@DiPlayActivity).toString())
+            }
+            fields.addView(input)
+            fields.addView(label(getString(R.string.ambient_day_factor_hint), 14, MUTED))
+            val dialog = AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(fields)
+                .setPositiveButton(getString(R.string.save), null)
+                .setNegativeButton(getString(R.string.cancel), null)
+                .setNeutralButton(getString(R.string.ambient_light_reset_defaults), null)
+                .create()
+            dialog.setOnShowListener {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener saveFactor@{
+                    val factor = input.text.toString().trim().toFloatOrNull()
+                    if (factor == null || !AmbientLightThreshold.isValidDayFactor(factor)) {
+                        input.error = getString(R.string.ambient_day_factor_error)
+                        return@saveFactor
+                    }
+                    AirPlayPersistence.saveAmbientDayFactor(this, factor)
+                    control.text = summary()
+                    dialog.dismiss()
+                }
+                dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                    input.setText(AmbientLightThreshold.DEFAULT_DAY_FACTOR.toString())
                     input.error = null
                 }
             }
