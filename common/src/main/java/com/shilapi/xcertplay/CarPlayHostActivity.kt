@@ -5047,6 +5047,12 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun appendLog(message: String) {
         val safe = DiagnosticRedactor.redact(message) ?: return
+        // Every connect stage flows through here (controller debug lines and airplay
+        // events alike), so the timeline rides the existing stream and emits its
+        // per-attempt summary when the session activates.
+        ConnectTimeline.observe(safe)?.let { summary ->
+            mainHandler.post { appendLog(summary) }
+        }
         val now = System.currentTimeMillis()
         sessionLog?.append(formattedLogLine(safe, now))
         if (AirPlayPersistence.loadSessionLogOverlay(this)) {
